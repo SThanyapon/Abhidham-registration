@@ -155,14 +155,17 @@ CREATE TABLE backup_runs (
 
 ## 4. Public features
 
-### 4.1 Student registration (`register.php`)
-Fields: prefix (dropdown incl. "อื่นๆ (ระบุ)" free-text), name-surname, age, address, phone,
-line ID, reference person (optional). Always targets whichever batch currently has
+### 4.1 Student registration (`index.php`, `register.php`)
+`index.php` is a landing page — the form is not shown until the visitor clicks "Register"
+(`?register=1`), so a first-time visit doesn't drop straight into a form. Fields: prefix
+(dropdown incl. "อื่นๆ (ระบุ)" free-text), name-surname, age, address, phone, line ID,
+reference person (optional). Always targets whichever batch currently has
 `registration_open = TRUE` at level `จูฬตรี`. Inserted as `status = 'pending'`. Rate-limited.
 
 ### 4.2 Check-in (`checkin.php`)
-Student enters name-surname + student ID + class, then **selects the Session ID themselves**
-from a dropdown of that class's sessions (no auto-detection by date). System:
+Student enters name-surname + student ID + class, then **selects the ครั้งที่ (session)
+themselves** from a dropdown of that class's sessions, shown as `dd/mm/yyyy` Buddhist Era
+(no auto-detection by date). System:
 1. Verifies name/ID/class match an approved student.
 2. If already checked in for that session → show error.
 3. Otherwise insert into `checkins`, then render a grid of all sessions so far: green =
@@ -188,6 +191,10 @@ number before allowing access.
 - Generate a recurring schedule: given number of sessions, start date, and days-of-week
   (e.g. Tue+Thu), bulk-insert `sessions` rows numbered sequentially.
 - Edit an individual session (reschedule date, cancel) without regenerating the whole series.
+  Dates are displayed/edited as `dd/mm/yyyy` Buddhist Era with a weekday label; since a native
+  HTML date input can't render Buddhist Era, the session date field is a BE-formatted text
+  input that's parsed back to a Gregorian ISO date server-side (`includes/date_helpers.php`
+  provides the shared `formatDateBE()` used here and in check-in).
 
 ### Feature 2 — Approve enrollment
 List `pending` students; on approval, generate `student_no` as `{batch_no}{group_digit}{seq}`,
@@ -247,7 +254,8 @@ to a configured recipient. Schedule and recipient are configurable in `config.lo
 │   ├── db.php
 │   ├── auth.php          (admin session + permission checks)
 │   ├── otp.php
-│   └── rate_limit.php
+│   ├── rate_limit.php
+│   └── date_helpers.php  (shared formatDateBE(), used by check-in and class management)
 ├── admin/
 │   ├── login.php
 │   ├── verify_otp.php
@@ -275,6 +283,13 @@ to a configured recipient. Schedule and recipient are configurable in `config.lo
 5. **Recurring schedule** — generating a schedule (e.g. every Mon & Thu) produces a concrete
    date for every session number; % complete is based on sessions up to the most recent
    past session's date, not a fixed "today" cutoff.
+6. **Date display** — dates shown to users (class start dates, session dates/dropdowns) are
+   formatted `dd/mm/yyyy` in the Buddhist Era (Gregorian year + 543), with a weekday label
+   where relevant. Underlying storage stays Gregorian ISO (`DATE` columns); conversion only
+   happens at display/input time.
+7. **Registration landing page** — `index.php` shows a landing page first; the registration
+   form only appears after the visitor clicks "Register" (`?register=1`), rather than being
+   shown immediately on first load.
 
 ## 9. Remaining open question
 
