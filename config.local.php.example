@@ -1,5 +1,5 @@
 <?php
-// Copy this file to config.local.php and fill in your real database credentials.
+// Copy this file to config.local.php and fill in your real settings.
 // config.local.php is gitignored so your secrets never get committed.
 
 return [
@@ -7,4 +7,30 @@ return [
     'db_name' => 'abhidham_registration',
     'db_user' => 'root',
     'db_pass' => '',
+
+    'mail' => [
+        'host' => 'smtp.example.com',
+        'port' => 587,
+        'encryption' => 'tls', // 'tls', 'ssl', or '' for none
+        'username' => 'noreply@example.com',
+        'password' => 'change-me',
+        'from_email' => 'noreply@example.com',
+        'from_name' => 'Abhidham Registration',
+    ],
+
+    'rate_limit' => [
+        'register' => ['max_attempts' => 5, 'window_seconds' => 3600],
+        'checkin' => ['max_attempts' => 20, 'window_seconds' => 3600],
+        'lookup' => ['max_attempts' => 10, 'window_seconds' => 3600],
+        'admin_login' => ['max_attempts' => 5, 'window_seconds' => 900],
+    ],
+
+    'otp' => [
+        'ttl_seconds' => 300,
+    ],
+
+    'backup' => [
+        'directory' => __DIR__ . '/backups',
+        'recipient_email' => 'admin@example.com',
+    ],
 ];
