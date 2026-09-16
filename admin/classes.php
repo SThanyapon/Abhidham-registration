@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/date_helpers.php';
 
 $adminId = requireAdminLogin();
 requireFeature($adminId, 1);
@@ -9,6 +10,29 @@ requireFeature($adminId, 1);
 $mysqli = getDbConnection();
 $notice = null;
 $error = null;
+
+function dayOfWeekLabel(string $isoDate, array $dayLabels): string
+{
+    $date = new DateTime($isoDate);
+
+    return $dayLabels[(int) $date->format('N')];
+}
+
+function parseDateBE(string $thaiDate): ?string
+{
+    if (!preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', trim($thaiDate), $m)) {
+        return null;
+    }
+
+    [, $day, $month, $buddhistYear] = $m;
+    $gregorianYear = (int) $buddhistYear - 543;
+
+    if (!checkdate((int) $month, (int) $day, $gregorianYear)) {
+        return null;
+    }
+
+    return sprintf('%04d-%02d-%02d', $gregorianYear, (int) $month, (int) $day);
+}
 
 function generateScheduleDates(string $startDate, array $daysOfWeek, int $numberOfSessions): array
 {
@@ -97,14 +121,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif ($action === 'update_session') {
         $sessionId = (int) ($_POST['session_id'] ?? 0);
-        $sessionDate = $_POST['session_date'] ?? '';
+        $sessionDate = parseDateBE($_POST['session_date'] ?? '');
         $isCancelled = isset($_POST['is_cancelled']) ? 1 : 0;
 
-        $stmt = $mysqli->prepare('UPDATE sessions SET session_date = ?, is_cancelled = ? WHERE id = ?');
-        $stmt->bind_param('sii', $sessionDate, $isCancelled, $sessionId);
-        $stmt->execute();
-        $stmt->close();
-        $notice = 'Session updated.';
+        if ($sessionDate === null) {
+            $error = 'Invalid date. Please use dd/mm/yyyy (Buddhist Era) format.';
+        } else {
+            $stmt = $mysqli->prepare('UPDATE sessions SET session_date = ?, is_cancelled = ? WHERE id = ?');
+            $stmt->bind_param('sii', $sessionDate, $isCancelled, $sessionId);
+            $stmt->execute();
+            $stmt->close();
+            $notice = 'Session updated.';
+        }
     }
 }
 
@@ -198,7 +226,7 @@ $dayLabels = [1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => '
                 <tr>
                     <td><?= htmlspecialchars($class['batch_name'] ?: 'รุ่น ' . $class['batch_no']) ?></td>
                     <td><?= htmlspecialchars($class['level_name']) ?></td>
-                    <td><?= htmlspecialchars($class['start_date']) ?></td>
+                    <td><?= htmlspecialchars(formatDateBE($class['start_date'])) ?></td>
                     <td><a href="classes.php?class_instance_id=<?= $class['id'] ?>">Manage sessions</a></td>
                 </tr>
             <?php endforeach; ?>
@@ -258,7 +286,9 @@ $dayLabels = [1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => '
                 <input type="hidden" name="action" value="update_session">
                 <input type="hidden" name="session_id" value="<?= $session['id'] ?>">
                 <span>#<?= $session['session_number'] ?></span>
-                <input type="date" name="session_date" value="<?= htmlspecialchars($session['session_date']) ?>">
+                <span><?= htmlspecialchars(dayOfWeekLabel($session['session_date'], $dayLabels)) ?></span>
+                <input type="text" name="session_date" value="<?= htmlspecialchars(formatDateBE($session['session_date'])) ?>"
+                       pattern="\d{1,2}/\d{1,2}/\d{4}" placeholder="dd/mm/yyyy (พ.ศ.)" required>
                 <label style="font-weight:normal;">
                     <input type="checkbox" name="is_cancelled" <?= $session['is_cancelled'] ? 'checked' : '' ?>> Cancelled
                 </label>

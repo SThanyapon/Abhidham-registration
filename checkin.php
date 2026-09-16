@@ -4,6 +4,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/rate_limit.php';
 require_once __DIR__ . '/includes/csrf.php';
 require_once __DIR__ . '/includes/attendance.php';
+require_once __DIR__ . '/includes/date_helpers.php';
 
 $mysqli = getDbConnection();
 $error = null;
@@ -92,8 +93,15 @@ foreach ($classes as $class) {
     );
     $sessionStmt->bind_param('i', $class['id']);
     $sessionStmt->execute();
-    $sessionsByClass[$class['id']] = $sessionStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $sessions = $sessionStmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $sessionStmt->close();
+
+    foreach ($sessions as &$session) {
+        $session['session_date_be'] = formatDateBE($session['session_date']);
+    }
+    unset($session);
+
+    $sessionsByClass[$class['id']] = $sessions;
 }
 ?>
 <!DOCTYPE html>
@@ -135,7 +143,7 @@ foreach ($classes as $class) {
             <?php endforeach; ?>
         </select>
 
-        <label for="session_id">Session</label>
+        <label for="session_id">ครั้งที่</label>
         <select id="session_id" name="session_id" required>
             <option value="">-- Select class first --</option>
         </select>
@@ -173,7 +181,7 @@ foreach ($classes as $class) {
             sessions.forEach(function (session) {
                 const option = document.createElement('option');
                 option.value = session.id;
-                option.textContent = 'Session ' + session.session_number + ' (' + session.session_date + ')';
+                option.textContent = 'ครั้งที่ ' + session.session_number + ' (' + session.session_date_be + ')';
                 sessionSelect.appendChild(option);
             });
         }

@@ -20,7 +20,12 @@ function sendEmail(string $to, string $subject, string $body): bool
     }
 
     $read = function () use ($socket) {
-        return fgets($socket, 512);
+        $response = '';
+        do {
+            $line = fgets($socket, 512);
+            $response .= $line;
+        } while (isset($line[3]) && $line[3] === '-');
+        return $response;
     };
     $write = function (string $command) use ($socket) {
         fwrite($socket, $command . "\r\n");

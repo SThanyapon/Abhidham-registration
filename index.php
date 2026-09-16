@@ -12,7 +12,7 @@ require_once __DIR__ . '/includes/csrf.php';
 <body>
     <h1>Abhidham Course Registration</h1>
     <nav>
-        <a href="index.php">Register</a>
+        <a href="index.php?register=1">Register</a>
         <a href="checkin.php">Check-in</a>
         <a href="lookup.php">Find my Student ID</a>
         <a href="admin/login.php">Admin</a>
@@ -23,6 +23,7 @@ require_once __DIR__ . '/includes/csrf.php';
     $batch = $mysqli->query(
         'SELECT id, batch_no, name FROM batches WHERE registration_open = 1 ORDER BY id DESC LIMIT 1'
     )->fetch_assoc();
+    $showForm = isset($_GET['register']) || isset($_GET['error']);
     ?>
 
     <?php if (isset($_GET['success'])): ?>
@@ -33,7 +34,10 @@ require_once __DIR__ . '/includes/csrf.php';
         <p class="error"><?= htmlspecialchars($_GET['error']) ?></p>
     <?php endif; ?>
 
-    <?php if (!$batch): ?>
+    <?php if (!$showForm): ?>
+        <p>Welcome. Click "Register" to begin your registration for the Abhidhamma course.</p>
+        <p><a href="index.php?register=1">Register now</a></p>
+    <?php elseif (!$batch): ?>
         <p class="error">Registration is currently closed. Please check back later.</p>
     <?php else: ?>
         <p>Registering for: <strong><?= htmlspecialchars($batch['name'] ?? ('รุ่น ' . $batch['batch_no'])) ?></strong>, class จูฬตรี</p>
