@@ -1,0 +1,10 @@
+<?php
+// Copy this file to config.local.php and fill in your real database credentials.
+// config.local.php is gitignored so your secrets never get committed.
+
+return [
+    'db_host' => '127.0.0.1',
+    'db_name' => 'abhidham_registration',
+    'db_user' => 'root',
+    'db_pass' => '',
+];
