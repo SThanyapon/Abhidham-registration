@@ -18,22 +18,6 @@ function dayOfWeekLabel(string $isoDate, array $dayLabels): string
     return $dayLabels[(int) $date->format('N')];
 }
 
-function parseDateBE(string $thaiDate): ?string
-{
-    if (!preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', trim($thaiDate), $m)) {
-        return null;
-    }
-
-    [, $day, $month, $buddhistYear] = $m;
-    $gregorianYear = (int) $buddhistYear - 543;
-
-    if (!checkdate((int) $month, (int) $day, $gregorianYear)) {
-        return null;
-    }
-
-    return sprintf('%04d-%02d-%02d', $gregorianYear, (int) $month, (int) $day);
-}
-
 function generateScheduleDates(string $startDate, array $daysOfWeek, int $numberOfSessions): array
 {
     $dates = [];
@@ -121,18 +105,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif ($action === 'update_session') {
         $sessionId = (int) ($_POST['session_id'] ?? 0);
-        $sessionDate = parseDateBE($_POST['session_date'] ?? '');
         $isCancelled = isset($_POST['is_cancelled']) ? 1 : 0;
 
-        if ($sessionDate === null) {
-            $error = 'Invalid date. Please use dd/mm/yyyy (Buddhist Era) format.';
-        } else {
-            $stmt = $mysqli->prepare('UPDATE sessions SET session_date = ?, is_cancelled = ? WHERE id = ?');
-            $stmt->bind_param('sii', $sessionDate, $isCancelled, $sessionId);
-            $stmt->execute();
-            $stmt->close();
-            $notice = 'Session updated.';
-        }
+        $stmt = $mysqli->prepare('UPDATE sessions SET is_cancelled = ? WHERE id = ?');
+        $stmt->bind_param('ii', $isCancelled, $sessionId);
+        $stmt->execute();
+        $stmt->close();
+        $notice = 'Session updated.';
     }
 }
 
@@ -287,9 +266,8 @@ $dayLabels = [
                 <span>ครั้งที่</span>
                 <span>วัน</span>
                 <span>วันที่</span>
-                <span>แก้ไขวันที่ (ว/ด/ปี พ.ศ.)</span>
-                <span>ยกเลิก</span>
-                <span></span>
+                <span>ยกเลิกตารางเรียน</span>
+                <span>บันทึก</span>
             </div>
             <?php foreach ($sessions as $session): ?>
                 <form action="classes.php?class_instance_id=<?= $selectedClassId ?>" method="post"
@@ -300,12 +278,10 @@ $dayLabels = [
                     <span>#<?= $session['session_number'] ?></span>
                     <span><?= htmlspecialchars(dayOfWeekLabel($session['session_date'], $dayLabels)) ?></span>
                     <span><?= htmlspecialchars(formatDateBEShort($session['session_date'])) ?></span>
-                    <input type="text" name="session_date" value="<?= htmlspecialchars(formatDateBE($session['session_date'])) ?>"
-                           pattern="\d{1,2}/\d{1,2}/\d{4}" placeholder="dd/mm/yyyy (พ.ศ.)" required>
                     <label style="font-weight:normal; margin:0;">
-                        <input type="checkbox" name="is_cancelled" <?= $session['is_cancelled'] ? 'checked' : '' ?>> Cancelled
+                        <input type="checkbox" name="is_cancelled" <?= $session['is_cancelled'] ? 'checked' : '' ?>> ยกเลิกตารางเรียน
                     </label>
-                    <button type="submit" class="secondary">Save</button>
+                    <button type="submit" class="secondary">บันทึก</button>
                 </form>
             <?php endforeach; ?>
         </div>
