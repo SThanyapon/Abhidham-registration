@@ -104,20 +104,22 @@ $pending = $mysqli->query(
                 ผู้แนะนำ: <?= htmlspecialchars($student['reference_person'] ?? '-') ?>
             </p>
 
-            <form action="approvals.php" method="post" style="flex-direction:row; align-items:center; gap:8px;">
-                <?= csrfField() ?>
-                <input type="hidden" name="action" value="approve">
-                <input type="hidden" name="student_id" value="<?= $student['id'] ?>">
-                <label style="font-weight:normal;"> กำหนดรหัสนักศึกษาเอง (optional)</label>
-                <input type="text" name="override_student_no" placeholder="กำหนดอัตโนมัติ">
-                <button type="submit">อนุมัติ</button>
-            </form>
-            <form action="approvals.php" method="post" style="display:inline-block; margin-top:8px;">
-                <?= csrfField() ?>
-                <input type="hidden" name="action" value="reject">
-                <input type="hidden" name="student_id" value="<?= $student['id'] ?>">
-                <button type="submit" class="danger">ไม่อนุมัติ</button>
-            </form>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <form action="approvals.php" method="post" style="flex-direction:row; align-items:center; gap:8px; background:none; box-shadow:none; padding:0; margin:0;">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="approve">
+                    <input type="hidden" name="student_id" value="<?= $student['id'] ?>">
+                    <label style="font-weight:normal;"> กำหนดรหัสนักศึกษาเอง (optional)</label>
+                    <input type="text" name="override_student_no" placeholder="กำหนดอัตโนมัติ">
+                    <button type="submit">อนุมัติ</button>
+                </form>
+                <form action="approvals.php" method="post" style="display:inline; box-shadow:none; padding:0; background:none; margin:0;">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="reject">
+                    <input type="hidden" name="student_id" value="<?= $student['id'] ?>">
+                    <button type="submit" class="danger">ไม่อนุมัติ</button>
+                </form>
+            </div>
         </div>
     <?php endforeach; ?>
 </body>
