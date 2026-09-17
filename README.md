@@ -5,6 +5,12 @@ registration/check-in/student-ID lookup, plus an OTP-protected admin backend for
 managing classes, approvals, promotions, and backups. See `DESIGN.md` for the full
 data model and feature design derived from the original requirements.
 
+## Requirements
+
+- PHP 8.0+ (the codebase uses `match` expressions and typed properties). The production VM
+  runs PHP 8.5.
+- MySQL/MariaDB with the `mysqli` extension.
+
 ## Setup
 
 1. Copy `config.local.php.example` to `config.local.php` and fill in your MySQL
@@ -44,6 +50,17 @@ An admin needs to, via `/admin/classes.php`:
   `otp_codes`. Run it frequently (e.g. hourly), since OTP codes are short-lived.
 
 Point Windows Task Scheduler (or cron on Linux) at both on whatever interval you need.
+
+## Rate limiting
+
+`includes/rate_limit.php` throttles every public form (register, check-in, lookup) by client IP,
+using the thresholds in `config.local.php['rate_limit']`. Admin login and OTP verification are
+throttled more defensively, on independent buckets so neither a single source nor a distributed
+one can brute-force an account:
+
+- `admin_login` — by IP, catches one source spraying many accounts.
+- `admin_login_account` — by username, catches one account attacked from many IPs.
+- `otp_verify` — by the pending admin ID, caps guesses against a valid login's OTP code.
 
 ## Known simplifications
 

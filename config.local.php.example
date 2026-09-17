@@ -23,6 +23,8 @@ return [
         'checkin' => ['max_attempts' => 20, 'window_seconds' => 3600],
         'lookup' => ['max_attempts' => 10, 'window_seconds' => 3600],
         'admin_login' => ['max_attempts' => 5, 'window_seconds' => 900],
+        'admin_login_account' => ['max_attempts' => 10, 'window_seconds' => 900],
+        'otp_verify' => ['max_attempts' => 5, 'window_seconds' => 300],
     ],
 
     'otp' => [

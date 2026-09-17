@@ -18,13 +18,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
 
     $ip = getClientIp();
+    $username = trim($_POST['username'] ?? '');
 
-    if (!checkRateLimit('admin_login', $ip)) {
+    $ipOk = checkRateLimit('admin_login', $ip);
+    $accountOk = $username === '' || checkRateLimit('admin_login_account', $username);
+
+    if (!$ipOk || !$accountOk) {
         $error = 'Too many login attempts. Please try again later.';
     } else {
         recordRateLimitHit('admin_login', $ip);
+        if ($username !== '') {
+            recordRateLimitHit('admin_login_account', $username);
+        }
 
-        $username = trim($_POST['username'] ?? '');
         $password = $_POST['password'] ?? '';
 
         $mysqli = getDbConnection();

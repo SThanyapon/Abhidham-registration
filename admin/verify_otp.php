@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/otp.php';
+require_once __DIR__ . '/../includes/rate_limit.php';
 
 ensureSessionStarted();
 
@@ -18,15 +19,21 @@ $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
 
-    $code = trim($_POST['code'] ?? '');
+    if (!checkRateLimit('otp_verify', (string) $pendingAdminId)) {
+        $error = 'Too many attempts. Please try again later.';
+    } else {
+        recordRateLimitHit('otp_verify', (string) $pendingAdminId);
 
-    if (verifyOtp((int) $pendingAdminId, $code)) {
-        loginAdmin((int) $pendingAdminId);
-        header('Location: dashboard.php');
-        exit;
+        $code = trim($_POST['code'] ?? '');
+
+        if (verifyOtp((int) $pendingAdminId, $code)) {
+            loginAdmin((int) $pendingAdminId);
+            header('Location: dashboard.php');
+            exit;
+        }
+
+        $error = 'Invalid or expired code.';
     }
-
-    $error = 'Invalid or expired code.';
 }
 ?>
 <!DOCTYPE html>

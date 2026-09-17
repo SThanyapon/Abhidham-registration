@@ -58,8 +58,11 @@ block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
   first; every form includes `<?= csrfField() ?>`.
 - `rate_limit.php` — sliding-window limiter (`checkRateLimit($formKey, $identifier)` +
   `recordRateLimitHit`) backed by the `rate_limit_hits` table, thresholds read from
-  `config.local.php['rate_limit']`. Applied to register, check-in, lookup, and admin login by
-  `form_key`, keyed by client IP (or IP+username for login).
+  `config.local.php['rate_limit']`. Applied to register, check-in, and lookup by `form_key`, keyed by
+  client IP. Admin login (`admin/login.php`) enforces two independent buckets — `admin_login` keyed by
+  IP and `admin_login_account` keyed by username — so a distributed attack spread across many IPs is
+  still capped per targeted account, not just per source. OTP verification (`admin/verify_otp.php`) adds
+  its own `otp_verify` bucket keyed by the pending admin ID.
 - `otp.php` — 6-digit OTP generation/verification for admin login, hashed at rest in `otp_codes`,
   single-use, TTL from config.
 - `mailer.php` — a hand-rolled minimal SMTP client (`sendEmail`) used for OTP codes and backup
