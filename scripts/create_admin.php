@@ -11,7 +11,7 @@ if (php_sapi_name() !== 'cli') {
 if (!$username || !$email || !$password) {
     die(
         "Usage: php scripts/create_admin.php <username> <email> <password> [feature_numbers_comma_separated]\n"
-        . "Example: php scripts/create_admin.php admin admin@example.com \"S3cret!\" 1,2,3,4\n"
+        . "Example: php scripts/create_admin.php admin admin@example.com \"S3cret!\" 1,2,3,4,5\n"
     );
 }
 
@@ -24,7 +24,7 @@ $stmt->execute();
 $adminId = $stmt->insert_id;
 $stmt->close();
 
-$featureList = $featuresArg ? array_map('intval', explode(',', $featuresArg)) : [1, 2, 3, 4];
+$featureList = $featuresArg ? array_map('intval', explode(',', $featuresArg)) : [1, 2, 3, 4, 5];
 
 foreach ($featureList as $feature) {
     $permStmt = $mysqli->prepare('INSERT INTO admin_permissions (admin_user_id, feature) VALUES (?, ?)');

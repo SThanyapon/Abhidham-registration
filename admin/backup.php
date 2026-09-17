@@ -5,7 +5,7 @@ require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/backup.php';
 
 $adminId = requireAdminLogin();
-requireFeature($adminId, 4);
+requireFeature($adminId, 5);
 
 $mysqli = getDbConnection();
 $notice = null;

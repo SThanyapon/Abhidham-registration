@@ -7,8 +7,8 @@ data model, feature breakdown, and folder structure for the PHP + MySQL implemen
 
 - **Student (public, no login)** — registers, checks in to sessions, looks up their own student ID.
 - **Admin/Staff (OTP login required)** — manages classes & schedules, approves enrollments,
-  promotes students, and runs backups. Access to each of the 4 backend features is granted
-  per-user (not all admins can do all 4 things).
+  runs attendance reports, promotes students, and runs backups. Access to each of the 5 backend
+  features is granted per-user (not all admins can do all 5 things).
 
 ## 2. Core domain concepts
 
@@ -117,10 +117,10 @@ CREATE TABLE admin_users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Per-user feature access (features 1-4 from the requirement doc)
+-- Per-user feature access
 CREATE TABLE admin_permissions (
     admin_user_id INT NOT NULL REFERENCES admin_users(id),
-    feature TINYINT NOT NULL,              -- 1=classes, 2=approvals, 3=promotions, 4=backup
+    feature TINYINT NOT NULL,              -- 1=classes, 2=approvals, 3=reports, 4=promotions, 5=backup
     PRIMARY KEY (admin_user_id, feature)
 );
 
@@ -223,12 +223,25 @@ if either ever exceeds 99 students in a single batch, the admin must manually as
 beyond that point (already supported via override + the `UNIQUE` constraint on
 `student_no`). In practice this is expected only for the นาย/นาง/นางสาว/อื่นๆ group.
 
-### Feature 3 — Promotion
-Restricted to admins with feature 3 permission. Select approved students who passed the
+### Feature 3 — Reports
+Restricted to admins with feature 3 permission (`admin/reports.php`). Attendance report for
+either a single selected student or all approved students at once:
+- **Single student** — the same per-session grid and % complete shown after check-in
+  (`includes/attendance.php`'s `getAttendanceSummary()`, reused as-is), plus the student's
+  batch/level.
+- **All students** (default view) — one row per approved student with completed/conducted
+  counts and % complete against their own current class instance; students whose level has no
+  `class_instance` yet (schedule not generated) show `-` instead of a percentage.
+- Both views can be exported to CSV (`?export=csv`, carries the current student selection) —
+  session-by-session for a single student, summary table for all students. UTF-8 BOM-prefixed
+  so Thai text renders correctly in Excel.
+
+### Feature 4 — Promotion
+Restricted to admins with feature 4 permission. Select approved students who passed the
 exam and advance `current_class_level_id` to the next level per the fixed progression order
 in `class_levels.sort_order`; every promotion is logged in `promotions`.
 
-### Feature 4 — Backup
+### Feature 5 — Backup
 Manual "Backup now" action plus a scheduled job (Windows Task Scheduler / cron calling
 `cron/backup.php`) that dumps the database to a timestamped `.sql` text file and emails it
 to a configured recipient. Schedule and recipient are configurable in `config.local.php`.
@@ -271,8 +284,9 @@ to a configured recipient. Schedule and recipient are configurable in `config.lo
 │   ├── dashboard.php
 │   ├── classes.php        (feature 1)
 │   ├── approvals.php      (feature 2)
-│   ├── promotions.php     (feature 3)
-│   └── backup.php         (feature 4)
+│   ├── reports.php        (feature 3)
+│   ├── promotions.php     (feature 4)
+│   └── backup.php         (feature 5)
 ├── cron/
 │   ├── backup.php
 │   └── clear_expired_otp.php
@@ -315,3 +329,10 @@ to a configured recipient. Schedule and recipient are configurable in `config.lo
   account, and `admin/verify_otp.php` had no throttle at all, so a stolen/guessed password
   could be paired with unlimited OTP brute-forcing. Added two more buckets: `admin_login_account`
   (keyed by username) and `otp_verify` (keyed by the pending admin ID) — see section 6.
+- **Feature 3 — Reports, added after initial design** — a new admin feature for attendance
+  reporting (`admin/reports.php`), inserted at number 3. This pushed the original Feature 3
+  (Promotion) to 4 and Feature 4 (Backup) to 5 — see section 5. Existing `admin_permissions`
+  rows for those two features must be renumbered (4→5, then 3→4, in that order to avoid a
+  primary-key collision on admins who already hold both) when deploying this change to an
+  existing database; a fresh `schema.sql` install is unaffected since it seeds no permission
+  rows itself.

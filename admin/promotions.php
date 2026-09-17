@@ -4,7 +4,7 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/auth.php';
 
 $adminId = requireAdminLogin();
-requireFeature($adminId, 3);
+requireFeature($adminId, 4);
 
 $mysqli = getDbConnection();
 $notice = null;

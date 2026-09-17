@@ -33,10 +33,13 @@ $stmt->close();
             <a href="approvals.php">2) Approve enrollments</a>
         <?php endif; ?>
         <?php if (in_array(3, $features, true)): ?>
-            <a href="promotions.php">3) Promote students</a>
+            <a href="reports.php">3) Reports</a>
         <?php endif; ?>
         <?php if (in_array(4, $features, true)): ?>
-            <a href="backup.php">4) Backup</a>
+            <a href="promotions.php">4) Promote students</a>
+        <?php endif; ?>
+        <?php if (in_array(5, $features, true)): ?>
+            <a href="backup.php">5) Backup</a>
         <?php endif; ?>
         <?php if ($features === []): ?>
             <p>You don't have access to any admin features yet. Ask another admin to grant access.</p>

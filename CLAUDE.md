@@ -6,7 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A PHP + MySQL classroom management system for the Abhidhamma course ("Abhidham Registration"): public
 student registration/check-in/student-ID lookup, plus an OTP-protected admin backend for managing
-classes, approvals, promotions, and backups. Plain PHP, no framework, no Composer/npm dependencies.
+classes, approvals, reports, promotions, and backups. Plain PHP, no framework, no Composer/npm
+dependencies.
 
 `DESIGN.md` is the source of truth for the data model and feature spec (derived from the original
 requirements doc) — read it before making schema or business-logic changes, especially the student ID
@@ -24,8 +25,9 @@ php -S localhost:8000
 # Apply/reset schema (creates DB abhidham_registration, seeds the 9 class levels)
 mysql -u root -p < schema.sql
 
-# Create an admin user (feature numbers: 1=classes, 2=approvals, 3=promotions, 4=backup; defaults to all 4)
-php scripts/create_admin.php <username> <email> <password> [1,2,3,4]
+# Create an admin user (feature numbers: 1=classes, 2=approvals, 3=reports, 4=promotions,
+# 5=backup; defaults to all 5)
+php scripts/create_admin.php <username> <email> <password> [1,2,3,4,5]
 
 # Run a manual DB backup (also invoked from admin/backup.php and intended for a scheduled task/cron)
 php cron/backup.php
@@ -53,7 +55,7 @@ block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
   depends on this one. All queries use prepared statements (`bind_param`).
 - `auth.php` — admin session management (`loginAdmin`/`logoutAdmin`/`currentAdminId`) and **per-feature**
   authorization: `requireAdminLogin()` gates on being logged in, `requireFeature($adminId, $n)` gates on
-  the numbered feature (1-4) via the `admin_permissions` table. Every admin page calls both.
+  the numbered feature (1-5) via the `admin_permissions` table. Every admin page calls both.
 - `csrf.php` — `csrfToken()`/`csrfField()`/`verifyCsrf()`. Every POST handler calls `verifyCsrf()`
   first; every form includes `<?= csrfField() ?>`.
 - `rate_limit.php` — sliding-window limiter (`checkRateLimit($formKey, $identifier)` +
@@ -100,5 +102,8 @@ sessions. Students enroll into a batch as `pending`, get approved (which assigns
 `class_levels.sort_order`, promotions logged in `promotions`).
 
 **Admin feature numbering** (used throughout `admin_permissions` and `requireFeature()` calls):
-1 = class/schedule management, 2 = enrollment approval, 3 = promotion, 4 = backup. Access to each is
-granted per-admin-user independently — a logged-in admin may not have all four.
+1 = class/schedule management, 2 = enrollment approval, 3 = reports, 4 = promotion, 5 = backup.
+Access to each is granted per-admin-user independently — a logged-in admin may not have all five.
+`admin/reports.php` (feature 3) reuses `includes/attendance.php`'s `getAttendanceSummary()` to show
+per-session attendance for one selected student or a summary table for every approved student, with
+a CSV export (`?export=csv`, carries the current `student_id` selection) for either view.

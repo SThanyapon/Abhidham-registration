@@ -2,7 +2,7 @@
 
 A PHP + MySQL classroom management system for the Abhidhamma course: public
 registration/check-in/student-ID lookup, plus an OTP-protected admin backend for
-managing classes, approvals, promotions, and backups. See `DESIGN.md` for the full
+managing classes, approvals, reports, promotions, and backups. See `DESIGN.md` for the full
 data model and feature design derived from the original requirements.
 
 ## Requirements
@@ -22,7 +22,7 @@ data model and feature design derived from the original requirements.
    ```
 3. Create your first admin user:
    ```
-   php scripts/create_admin.php <username> <email> <password> 1,2,3,4
+   php scripts/create_admin.php <username> <email> <password> 1,2,3,4,5
    ```
 4. Run a local PHP server:
    ```

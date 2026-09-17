@@ -97,7 +97,7 @@ CREATE TABLE student_id_sequences (
 
 CREATE TABLE admin_permissions (
     admin_user_id INT NOT NULL,
-    feature TINYINT NOT NULL,
+    feature TINYINT NOT NULL, -- 1=classes, 2=approvals, 3=reports, 4=promotions, 5=backup
     PRIMARY KEY (admin_user_id, feature),
     FOREIGN KEY (admin_user_id) REFERENCES admin_users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
