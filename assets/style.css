@@ -122,6 +122,10 @@ th, td {
     background: #9ca3af;
 }
 
+.session-cancelled {
+    opacity: 0.45;
+}
+
 .progress {
     font-weight: 600;
     margin-bottom: 8px;

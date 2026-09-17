@@ -163,7 +163,10 @@ if ($selectedClassId > 0) {
     $stmt->close();
 }
 
-$dayLabels = [1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => 'Sat', 7 => 'Sun'];
+$dayLabels = [
+    1 => 'จันทร์', 2 => 'อังคาร', 3 => 'พุธ', 4 => 'พฤหัสบดี',
+    5 => 'ศุกร์', 6 => 'เสาร์', 7 => 'อาทิตย์',
+];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -236,38 +239,38 @@ $dayLabels = [1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => '
     <form action="classes.php" method="post">
         <?= csrfField() ?>
         <input type="hidden" name="action" value="create_class_instance">
-        <label for="batch_id">Batch</label>
+        <label for="batch_id">รุ่นที่</label>
         <select id="batch_id" name="batch_id" required>
             <?php foreach ($batches as $batch): ?>
                 <option value="<?= $batch['id'] ?>"><?= htmlspecialchars($batch['name'] ?: 'รุ่น ' . $batch['batch_no']) ?></option>
             <?php endforeach; ?>
         </select>
-        <label for="class_level_id">Level</label>
+        <label for="class_level_id">ระดับ</label>
         <select id="class_level_id" name="class_level_id" required>
             <?php foreach ($classLevels as $level): ?>
                 <option value="<?= $level['id'] ?>"><?= htmlspecialchars($level['name']) ?></option>
             <?php endforeach; ?>
         </select>
-        <label for="start_date">Start date</label>
+        <label for="start_date">วันที่เริ่มเรียน</label>
         <input type="date" id="start_date" name="start_date" required>
         <button type="submit">Create class</button>
     </form>
 
     <?php if ($selectedClassId > 0): ?>
-        <h2>Sessions</h2>
+        <h2>ตารางเรียน</h2>
 
         <form action="classes.php" method="post">
             <?= csrfField() ?>
             <input type="hidden" name="action" value="generate_schedule">
             <input type="hidden" name="class_instance_id" value="<?= $selectedClassId ?>">
 
-            <label for="schedule_start_date">Schedule start date</label>
+            <label for="schedule_start_date">วันที่เริ่มเรียน</label>
             <input type="date" id="schedule_start_date" name="schedule_start_date" required>
 
-            <label for="number_of_sessions">Number of sessions</label>
+            <label for="number_of_sessions">จำนวนครั้งที่เรียน</label>
             <input type="number" id="number_of_sessions" name="number_of_sessions" min="1" required>
 
-            <label>Days of week</label>
+            <label>วันเรียน</label>
             <div>
                 <?php foreach ($dayLabels as $num => $label): ?>
                     <label style="font-weight:normal; display:inline-block; margin-right:8px;">
@@ -281,6 +284,7 @@ $dayLabels = [1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => '
 
         <?php foreach ($sessions as $session): ?>
             <form action="classes.php?class_instance_id=<?= $selectedClassId ?>" method="post"
+                  class="<?= $session['is_cancelled'] ? 'session-cancelled' : '' ?>"
                   style="flex-direction:row; align-items:center; gap:8px; padding:12px;">
                 <?= csrfField() ?>
                 <input type="hidden" name="action" value="update_session">
