@@ -74,21 +74,21 @@ $pending = $mysqli->query(
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Approve Enrollments - Abhidham Registration</title>
+    <title> อนุมัติการลงทะเบียน</title>
     <link rel="stylesheet" href="../assets/style.css">
 </head>
 <body>
-    <h1>Approve Enrollments</h1>
+    <h1>อนุมัติการลงทะเบียน</h1>
     <nav>
-        <a href="dashboard.php">Dashboard</a>
-        <a href="logout.php">Log out</a>
+        <a href="dashboard.php">กลับหน้าแผงควบคุม</a>
+        <a href="logout.php">ออกจากระบบ</a>
     </nav>
 
     <?php if ($notice): ?><p class="success"><?= htmlspecialchars($notice) ?></p><?php endif; ?>
     <?php if ($error): ?><p class="error"><?= htmlspecialchars($error) ?></p><?php endif; ?>
 
     <?php if ($pending === []): ?>
-        <p>No pending registrations.</p>
+        <p>ไม่มีการลงทะเบียนที่รอการอนุมัติ</p>
     <?php endif; ?>
 
     <?php foreach ($pending as $student): ?>
@@ -98,25 +98,25 @@ $pending = $mysqli->query(
                 — <?= htmlspecialchars($student['batch_name'] ?: 'รุ่น ' . $student['batch_no']) ?>
             </p>
             <p>
-                Age: <?= htmlspecialchars((string) ($student['age'] ?? '-')) ?> |
-                Phone: <?= htmlspecialchars($student['phone']) ?> |
-                Line: <?= htmlspecialchars($student['line_id'] ?? '-') ?> |
-                Ref: <?= htmlspecialchars($student['reference_person'] ?? '-') ?>
+                อายุ: <?= htmlspecialchars((string) ($student['age'] ?? '-')) ?> |
+                หมายเลขโทรศัพท์: <?= htmlspecialchars($student['phone']) ?> |
+                ไอดีไลน์: <?= htmlspecialchars($student['line_id'] ?? '-') ?> |
+                ผู้แนะนำ: <?= htmlspecialchars($student['reference_person'] ?? '-') ?>
             </p>
 
             <form action="approvals.php" method="post" style="flex-direction:row; align-items:center; gap:8px;">
                 <?= csrfField() ?>
                 <input type="hidden" name="action" value="approve">
                 <input type="hidden" name="student_id" value="<?= $student['id'] ?>">
-                <label style="font-weight:normal;">Override ID (optional)</label>
-                <input type="text" name="override_student_no" placeholder="auto-generate">
-                <button type="submit">Approve</button>
+                <label style="font-weight:normal;"> กำหนดรหัสนักศึกษาเอง (optional)</label>
+                <input type="text" name="override_student_no" placeholder="กำหนดอัตโนมัติ">
+                <button type="submit">อนุมัติ</button>
             </form>
             <form action="approvals.php" method="post" style="display:inline-block; margin-top:8px;">
                 <?= csrfField() ?>
                 <input type="hidden" name="action" value="reject">
                 <input type="hidden" name="student_id" value="<?= $student['id'] ?>">
-                <button type="submit" class="danger">Reject</button>
+                <button type="submit" class="danger">ไม่อนุมัติ</button>
             </form>
         </div>
     <?php endforeach; ?>

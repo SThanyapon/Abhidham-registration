@@ -20,7 +20,7 @@ $stmt->close();
     <link rel="stylesheet" href="../assets/style.css">
 </head>
 <body>
-    <h1>ส่วนสำหรับผู้ดูแลระบบ</h1>
+    <h1>แผงควบคุมสำหรับผู้ดูแลระบบ</h1>
     <nav>
         <a href="logout.php">ออกจากระบบ</a>
     </nav>

@@ -151,14 +151,14 @@ $dayLabels = [
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Manage Classes - Abhidham Registration</title>
+    <title>การจัดการชั้นเรียนและตารางเรียน</title>
     <link rel="stylesheet" href="../assets/style.css">
 </head>
 <body>
     <h1>การจัดการชั้นเรียนและตารางเรียน</h1>
     <nav>
-        <a href="dashboard.php">Dashboard</a>
-        <a href="logout.php">Log out</a>
+        <a href="dashboard.php">กลับหน้าแผงควบคุม</a>
+        <a href="logout.php">ออกจากระบบ</a>
     </nav>
 
     <?php if ($notice): ?><p class="success"><?= htmlspecialchars($notice) ?></p><?php endif; ?>
