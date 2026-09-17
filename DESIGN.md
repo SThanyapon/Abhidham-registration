@@ -164,8 +164,8 @@ reference person (optional). Always targets whichever batch currently has
 
 ### 4.2 Check-in (`checkin.php`)
 Student enters name-surname + student ID + class, then **selects the ครั้งที่ (session)
-themselves** from a dropdown of that class's sessions, shown as `dd/mm/yyyy` Buddhist Era
-(no auto-detection by date). System:
+themselves** from a dropdown of that class's sessions, shown in short Thai Buddhist Era date
+format (e.g. `17 ก.ย. 69`; no auto-detection by date). System:
 1. Verifies name/ID/class match an approved student.
 2. If already checked in for that session → show error.
 3. Otherwise insert into `checkins`, then render a grid of all sessions so far: green =
@@ -190,11 +190,12 @@ number before allowing access.
 - Create a `class_instance` (batch + level + start date).
 - Generate a recurring schedule: given number of sessions, start date, and days-of-week
   (e.g. Tue+Thu), bulk-insert `sessions` rows numbered sequentially.
-- Edit an individual session (reschedule date, cancel) without regenerating the whole series.
-  Dates are displayed/edited as `dd/mm/yyyy` Buddhist Era with a weekday label; since a native
-  HTML date input can't render Buddhist Era, the session date field is a BE-formatted text
-  input that's parsed back to a Gregorian ISO date server-side (`includes/date_helpers.php`
-  provides the shared `formatDateBE()` used here and in check-in).
+- Cancel an individual session (toggle `is_cancelled`) without regenerating the whole series.
+  Rescheduling a single session's date is not supported from the UI — regenerate/adjust via
+  the schedule generator instead. Each session is shown with a weekday label and its date in
+  short Thai Buddhist Era format (e.g. `17 ก.ย. 69`, via the shared `formatDateBEShort()` in
+  `includes/date_helpers.php`, also used in check-in). Cancelled sessions are rendered with a
+  grey row background for quick scanning.
 
 ### Feature 2 — Approve enrollment
 List `pending` students; on approval, generate `student_no` as `{batch_no}{group_digit}{seq}`,
@@ -255,7 +256,7 @@ to a configured recipient. Schedule and recipient are configurable in `config.lo
 │   ├── auth.php          (admin session + permission checks)
 │   ├── otp.php
 │   ├── rate_limit.php
-│   └── date_helpers.php  (shared formatDateBE(), used by check-in and class management)
+│   └── date_helpers.php  (shared formatDateBEShort(), used by check-in and class management)
 ├── admin/
 │   ├── login.php
 │   ├── verify_otp.php
@@ -265,7 +266,8 @@ to a configured recipient. Schedule and recipient are configurable in `config.lo
 │   ├── promotions.php     (feature 3)
 │   └── backup.php         (feature 4)
 ├── cron/
-│   └── backup.php
+│   ├── backup.php
+│   └── clear_expired_otp.php
 └── assets/
     └── style.css
 ```
@@ -284,15 +286,18 @@ to a configured recipient. Schedule and recipient are configurable in `config.lo
    date for every session number; % complete is based on sessions up to the most recent
    past session's date, not a fixed "today" cutoff.
 6. **Date display** — dates shown to users (class start dates, session dates/dropdowns) are
-   formatted `dd/mm/yyyy` in the Buddhist Era (Gregorian year + 543), with a weekday label
-   where relevant. Underlying storage stays Gregorian ISO (`DATE` columns); conversion only
-   happens at display/input time.
+   formatted as a short Thai Buddhist Era date, e.g. `17 ก.ย. 69` (day, abbreviated Thai
+   month, 2-digit BE year — Gregorian year + 543), with a weekday label where relevant.
+   Underlying storage stays Gregorian ISO (`DATE` columns); conversion only happens at
+   display time (`formatDateBEShort()` in `includes/date_helpers.php`).
 7. **Registration landing page** — `index.php` shows a landing page first; the registration
    form only appears after the visitor clicks "Register" (`?register=1`), rather than being
    shown immediately on first load.
 
-## 9. Remaining open question
+## 9. Resolved decisions since initial design
 
-- **Rate limiting on the lookup form** — the doc only names register and check-in
-  explicitly; recommend limiting lookup too since it's also public and unauthenticated.
-  Will apply the same configurable limiter unless you say otherwise.
+- **Rate limiting on the lookup form** — the original requirement doc only named register
+  and check-in explicitly; `lookup.php` is rate-limited the same way (`form_key = 'lookup'`),
+  since it's also public and unauthenticated.
+- **Expired OTP cleanup** — `cron/clear_expired_otp.php` purges expired `otp_codes` rows on a
+  schedule (hourly in production), keeping the table small.

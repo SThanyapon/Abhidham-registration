@@ -29,6 +29,9 @@ php scripts/create_admin.php <username> <email> <password> [1,2,3,4]
 
 # Run a manual DB backup (also invoked from admin/backup.php and intended for a scheduled task/cron)
 php cron/backup.php
+
+# Purge expired OTP codes (intended for a scheduled task/cron; runs hourly in production)
+php cron/clear_expired_otp.php
 ```
 
 First-time setup requires copying `config.local.php.example` to `config.local.php` (gitignored) and
@@ -75,9 +78,16 @@ block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
   under `config.local.php['backup']['directory']` (no dependency on the `mysqldump` binary), logs to
   `backup_runs`, emails a notification (without the file attached, since `mailer.php` has no attachment
   support).
+- `date_helpers.php` — `formatDateBEShort()`: renders an ISO date as a short Thai Buddhist-Era date
+  (e.g. `17 ก.ย. 69` — day, abbreviated Thai month, 2-digit BE year). Used wherever a session/class date
+  is displayed to students or admins (`checkin.php`, `admin/classes.php`); storage stays Gregorian ISO
+  (`DATE` columns), conversion only happens at display time.
 
 **`cron/backup.php`** is the CLI entry point for scheduled backups (Windows Task Scheduler or cron),
 calling `includes/backup.php`'s `runBackup('scheduled')`.
+
+**`cron/clear_expired_otp.php`** is the CLI entry point for purging expired rows from `otp_codes`
+(`WHERE expires_at < NOW()`), intended to run frequently (e.g. hourly) since OTP codes are short-lived.
 
 **Domain model** (see DESIGN.md §2-3 for full schema): batches (รุ่น, numbered cohorts with an
 open/closed registration flag) contain class_instances (one per class level), which have generated

@@ -35,12 +35,15 @@ An admin needs to, via `/admin/classes.php`:
 1. Create a batch (รุ่น) and open its registration.
 2. Create a class instance (batch + level) and generate its recurring session schedule.
 
-## Scheduled backups
+## Scheduled jobs
 
-`cron/backup.php` is a CLI script (`php cron/backup.php`) that dumps the database
-to a timestamped `.sql` file under the configured `backup.directory` and emails a
-notification. Point Windows Task Scheduler (or cron on Linux) at it on whatever
-interval you need.
+- `cron/backup.php` — CLI script (`php cron/backup.php`) that dumps the database
+  to a timestamped `.sql` file under the configured `backup.directory` and emails
+  a notification. Run it weekly (e.g. Saturday night).
+- `cron/clear_expired_otp.php` — CLI script that deletes expired rows from
+  `otp_codes`. Run it frequently (e.g. hourly), since OTP codes are short-lived.
+
+Point Windows Task Scheduler (or cron on Linux) at both on whatever interval you need.
 
 ## Known simplifications
 
