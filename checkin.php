@@ -97,7 +97,7 @@ foreach ($classes as $class) {
     $sessionStmt->close();
 
     foreach ($sessions as &$session) {
-        $session['session_date_be'] = formatDateBE($session['session_date']);
+        $session['session_date_be'] = formatDateBEShort($session['session_date']);
     }
     unset($session);
 
@@ -160,7 +160,7 @@ foreach ($classes as $class) {
             <div class="session-grid">
                 <?php foreach ($attendance['sessions'] as $session): ?>
                     <div class="session-box <?= $session['checked_in'] ? 'checked' : 'missing' ?>"
-                         title="<?= htmlspecialchars($session['session_date']) ?>">
+                         title="<?= htmlspecialchars(formatDateBEShort($session['session_date'])) ?>">
                         <?= $session['session_number'] ?>
                     </div>
                 <?php endforeach; ?>

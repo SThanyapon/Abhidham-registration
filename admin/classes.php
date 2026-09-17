@@ -173,7 +173,7 @@ $dayLabels = [1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => '
     <link rel="stylesheet" href="../assets/style.css">
 </head>
 <body>
-    <h1>Manage Classes &amp; Schedules</h1>
+    <h1>การจัดการชั้นเรียนและตารางเรียน</h1>
     <nav>
         <a href="dashboard.php">Dashboard</a>
         <a href="logout.php">Log out</a>
@@ -182,17 +182,17 @@ $dayLabels = [1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => '
     <?php if ($notice): ?><p class="success"><?= htmlspecialchars($notice) ?></p><?php endif; ?>
     <?php if ($error): ?><p class="error"><?= htmlspecialchars($error) ?></p><?php endif; ?>
 
-    <h2>Batches (รุ่น)</h2>
+    <h2>รุ่นที่เปิดสอน</h2>
     <table>
         <thead>
-            <tr><th>รุ่น</th><th>Name</th><th>Registration</th><th></th></tr>
+            <tr><th>รุ่นที่</th><th>ชื่อรุ่น</th><th>สถานการลงทะเบียน</th><th></th></tr>
         </thead>
         <tbody>
             <?php foreach ($batches as $batch): ?>
                 <tr>
                     <td><?= $batch['batch_no'] ?></td>
                     <td><?= htmlspecialchars($batch['name'] ?? '') ?></td>
-                    <td><?= $batch['registration_open'] ? 'Open' : 'Closed' ?></td>
+                    <td><?= $batch['registration_open'] ? 'เปิดลงทะเบียน' : 'ยังไม่เปิดลงทะเบียน' ?></td>
                     <td>
                         <form action="classes.php" method="post" style="display:inline; box-shadow:none; padding:0; background:none;">
                             <?= csrfField() ?>
@@ -209,25 +209,25 @@ $dayLabels = [1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => '
     <form action="classes.php" method="post">
         <?= csrfField() ?>
         <input type="hidden" name="action" value="create_batch">
-        <label for="batch_no">New batch number (รุ่น)</label>
+        <label for="batch_no">รุ่นที่เปิดใหม่</label>
         <input type="number" id="batch_no" name="batch_no" required>
-        <label for="name">Name</label>
+        <label for="name">ชื่อรุ่นที่เปิดใหม่</label>
         <input type="text" id="name" name="name" placeholder="e.g. รุ่น 7 ฉัฏฐญาณะ">
-        <button type="submit">Create batch</button>
+        <button type="submit">เปิดรุ่นใหม่</button>
     </form>
 
-    <h2>Classes</h2>
+    <h2>ห้องเรียน</h2>
     <table>
         <thead>
-            <tr><th>รุ่น</th><th>Level</th><th>Start date</th><th></th></tr>
+            <tr><th>รุ่นที่</th><th>ระดับ</th><th>วันที่เริ่มเรียน</th><th></th></tr>
         </thead>
         <tbody>
             <?php foreach ($classInstances as $class): ?>
                 <tr>
                     <td><?= htmlspecialchars($class['batch_name'] ?: 'รุ่น ' . $class['batch_no']) ?></td>
                     <td><?= htmlspecialchars($class['level_name']) ?></td>
-                    <td><?= htmlspecialchars(formatDateBE($class['start_date'])) ?></td>
-                    <td><a href="classes.php?class_instance_id=<?= $class['id'] ?>">Manage sessions</a></td>
+                    <td><?= htmlspecialchars(formatDateBEShort($class['start_date'])) ?></td>
+                    <td><a href="classes.php?class_instance_id=<?= $class['id'] ?>">จัดการตารางเรียน</a></td>
                 </tr>
             <?php endforeach; ?>
         </tbody>
