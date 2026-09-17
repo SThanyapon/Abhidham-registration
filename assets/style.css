@@ -122,6 +122,42 @@ th, td {
     background: #9ca3af;
 }
 
+.session-table {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-bottom: 24px;
+    overflow: hidden;
+}
+
+.session-table-header,
+.session-row {
+    display: grid;
+    grid-template-columns: 56px 88px 96px 1fr 120px 88px;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+}
+
+.session-table-header {
+    font-weight: 600;
+    font-size: 0.85rem;
+    background: #f3f4f6;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.session-row {
+    background: none;
+    box-shadow: none;
+    border-radius: 0;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 0;
+}
+
+.session-row:last-child {
+    border-bottom: none;
+}
+
 .session-cancelled {
     opacity: 0.45;
 }

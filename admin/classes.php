@@ -282,23 +282,33 @@ $dayLabels = [
             <button type="submit">Generate schedule</button>
         </form>
 
-        <?php foreach ($sessions as $session): ?>
-            <form action="classes.php?class_instance_id=<?= $selectedClassId ?>" method="post"
-                  class="<?= $session['is_cancelled'] ? 'session-cancelled' : '' ?>"
-                  style="flex-direction:row; align-items:center; gap:8px; padding:12px;">
-                <?= csrfField() ?>
-                <input type="hidden" name="action" value="update_session">
-                <input type="hidden" name="session_id" value="<?= $session['id'] ?>">
-                <span>#<?= $session['session_number'] ?></span>
-                <span><?= htmlspecialchars(dayOfWeekLabel($session['session_date'], $dayLabels)) ?></span>
-                <input type="text" name="session_date" value="<?= htmlspecialchars(formatDateBE($session['session_date'])) ?>"
-                       pattern="\d{1,2}/\d{1,2}/\d{4}" placeholder="dd/mm/yyyy (พ.ศ.)" required>
-                <label style="font-weight:normal;">
-                    <input type="checkbox" name="is_cancelled" <?= $session['is_cancelled'] ? 'checked' : '' ?>> Cancelled
-                </label>
-                <button type="submit" class="secondary">Save</button>
-            </form>
-        <?php endforeach; ?>
+        <div class="session-table">
+            <div class="session-table-header">
+                <span>ครั้งที่</span>
+                <span>วัน</span>
+                <span>วันที่</span>
+                <span>แก้ไขวันที่ (ว/ด/ปี พ.ศ.)</span>
+                <span>ยกเลิก</span>
+                <span></span>
+            </div>
+            <?php foreach ($sessions as $session): ?>
+                <form action="classes.php?class_instance_id=<?= $selectedClassId ?>" method="post"
+                      class="session-row <?= $session['is_cancelled'] ? 'session-cancelled' : '' ?>">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="update_session">
+                    <input type="hidden" name="session_id" value="<?= $session['id'] ?>">
+                    <span>#<?= $session['session_number'] ?></span>
+                    <span><?= htmlspecialchars(dayOfWeekLabel($session['session_date'], $dayLabels)) ?></span>
+                    <span><?= htmlspecialchars(formatDateBEShort($session['session_date'])) ?></span>
+                    <input type="text" name="session_date" value="<?= htmlspecialchars(formatDateBE($session['session_date'])) ?>"
+                           pattern="\d{1,2}/\d{1,2}/\d{4}" placeholder="dd/mm/yyyy (พ.ศ.)" required>
+                    <label style="font-weight:normal; margin:0;">
+                        <input type="checkbox" name="is_cancelled" <?= $session['is_cancelled'] ? 'checked' : '' ?>> Cancelled
+                    </label>
+                    <button type="submit" class="secondary">Save</button>
+                </form>
+            <?php endforeach; ?>
+        </div>
     <?php endif; ?>
 </body>
 </html>
