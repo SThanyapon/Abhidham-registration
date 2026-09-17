@@ -134,11 +134,13 @@ CREATE TABLE otp_codes (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Rate limiting (register, check-in, admin login) — sliding window per IP+form
+-- Rate limiting — sliding window per (form_key, identifier). Most forms are keyed by
+-- client IP; admin login and OTP verification use narrower identifiers (see section 6).
 CREATE TABLE rate_limit_hits (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    form_key VARCHAR(50) NOT NULL,         -- 'register', 'checkin', 'admin_login'
-    identifier VARCHAR(100) NOT NULL,      -- IP address (or IP+username for login)
+    form_key VARCHAR(50) NOT NULL,         -- 'register', 'checkin', 'lookup', 'admin_login',
+                                            -- 'admin_login_account', 'otp_verify'
+    identifier VARCHAR(100) NOT NULL,      -- IP address, username, or pending admin ID
     hit_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX (form_key, identifier, hit_at)
 );
@@ -233,8 +235,14 @@ to a configured recipient. Schedule and recipient are configurable in `config.lo
 
 ## 6. Security
 
-- **OTP + rate limiting on admin login**, and **rate limiting on register/check-in**, all with
-  thresholds read from `config.local.php` (e.g. max attempts per IP per time window).
+- **Rate limiting**, thresholds read from `config.local.php['rate_limit']`, sliding window per
+  `(form_key, identifier)`:
+  - `register`, `checkin`, `lookup` — keyed by client IP.
+  - `admin_login` — keyed by client IP, catches one source spraying many accounts.
+  - `admin_login_account` — keyed by username, catches one account attacked from many IPs
+    (a purely IP-based limit can't stop a distributed brute force against a single account).
+  - `otp_verify` — keyed by the pending admin ID, caps guesses against a valid login's OTP
+    code independent of source IP.
 - Passwords hashed with `password_hash()` (bcrypt); OTP codes hashed at rest, single-use,
   short-lived.
 - All admin actions (approve, promote, schedule change, backup) should be attributable to
@@ -301,3 +309,9 @@ to a configured recipient. Schedule and recipient are configurable in `config.lo
   since it's also public and unauthenticated.
 - **Expired OTP cleanup** — `cron/clear_expired_otp.php` purges expired `otp_codes` rows on a
   schedule (hourly in production), keeping the table small.
+- **Per-account rate limiting on admin login and OTP verification** — the original design only
+  called for rate limiting "per IP per time window" (section 6). In practice a single IP-based
+  bucket on `admin/login.php` doesn't stop a botnet spreading guesses across many IPs at one
+  account, and `admin/verify_otp.php` had no throttle at all, so a stolen/guessed password
+  could be paired with unlimited OTP brute-forcing. Added two more buckets: `admin_login_account`
+  (keyed by username) and `otp_verify` (keyed by the pending admin ID) — see section 6.
