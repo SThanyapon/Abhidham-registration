@@ -3,6 +3,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/rate_limit.php';
 require_once __DIR__ . '/includes/csrf.php';
+require_once __DIR__ . '/includes/input.php';
 require_once __DIR__ . '/includes/attendance.php';
 require_once __DIR__ . '/includes/date_helpers.php';
 
@@ -17,12 +18,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ip = getClientIp();
 
     if (!checkRateLimit('checkin', $ip)) {
-        $error = 'Too many attempts. Please try again later.';
+        $error = 'มีการลองหลายครั้งเกินไป กรุณาลองใหม่ภายหลัง';
     } else {
         recordRateLimitHit('checkin', $ip);
 
-        $fullName = trim($_POST['full_name'] ?? '');
-        $studentNo = trim($_POST['student_no'] ?? '');
+        $fullName = cleanText($_POST['full_name'] ?? '');
+        $studentNo = cleanCode($_POST['student_no'] ?? '');
         $classInstanceId = (int) ($_POST['class_instance_id'] ?? 0);
         $sessionId = (int) ($_POST['session_id'] ?? 0);
 
@@ -38,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->close();
 
         if (!$student) {
-            $error = 'Name, Student ID, or Class does not match our records.';
+            $error = 'ชื่อ รหัสนักศึกษา หรือชั้นเรียนไม่ตรงกับข้อมูลในระบบ';
         } else {
             $sessionStmt = $mysqli->prepare(
                 'SELECT id FROM sessions WHERE id = ? AND class_instance_id = ? AND is_cancelled = 0'
@@ -49,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $sessionStmt->close();
 
             if (!$session) {
-                $error = 'Invalid session selected.';
+                $error = 'ครั้งที่เรียนที่เลือกไม่ถูกต้อง';
             } else {
                 $dupStmt = $mysqli->prepare(
                     'SELECT id FROM checkins WHERE student_id = ? AND session_id = ?'
@@ -60,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $dupStmt->close();
 
                 if ($already) {
-                    $error = 'You have already checked in for this session.';
+                    $error = 'คุณได้ลงชื่อเข้าเรียนครั้งนี้แล้ว';
                 } else {
                     $insert = $mysqli->prepare(
                         'INSERT INTO checkins (student_id, session_id) VALUES (?, ?)'
@@ -108,16 +109,20 @@ foreach ($classes as $class) {
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>Check-in - Abhidham Registration</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap">
+    <title>ลงชื่อเข้าเรียน - ระบบลงทะเบียนอภิธรรม</title>
     <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
-    <h1>Class Check-in</h1>
+    <h1>ลงชื่อเข้าเรียน</h1>
     <nav>
-        <a href="index.php">Register</a>
-        <a href="checkin.php">Check-in</a>
-        <a href="lookup.php">Find my Student ID</a>
-        <a href="admin/login.php">Admin</a>
+        <a href="index.php">ลงทะเบียน</a>
+        <a href="checkin.php">ลงชื่อเข้าเรียน</a>
+        <a href="lookup.php">ค้นหารหัสนักศึกษา</a>
+        <a href="admin/login.php">ผู้ดูแลระบบ</a>
     </nav>
 
     <?php if ($error): ?>
@@ -127,15 +132,15 @@ foreach ($classes as $class) {
     <form action="checkin.php" method="post">
         <?= csrfField() ?>
 
-        <label for="full_name">Name-Surname (Thai)</label>
+        <label for="full_name">ชื่อ-นามสกุล (ภาษาไทย)</label>
         <input type="text" id="full_name" name="full_name" required>
 
-        <label for="student_no">Student ID</label>
+        <label for="student_no">รหัสนักศึกษา</label>
         <input type="text" id="student_no" name="student_no" required>
 
-        <label for="class_instance_id">Class</label>
+        <label for="class_instance_id">ชั้นเรียน</label>
         <select id="class_instance_id" name="class_instance_id" required onchange="updateSessions()">
-            <option value="">-- Select class --</option>
+            <option value="">-- เลือกชั้นเรียน --</option>
             <?php foreach ($classes as $class): ?>
                 <option value="<?= $class['id'] ?>" <?= $selectedClassInstanceId === (int) $class['id'] ? 'selected' : '' ?>>
                     <?= htmlspecialchars(($class['batch_name'] ?: 'รุ่น ' . $class['batch_no']) . ' - ' . $class['level_name']) ?>
@@ -148,13 +153,13 @@ foreach ($classes as $class) {
             <option value="">-- Select class first --</option>
         </select>
 
-        <button type="submit">Check-in</button>
+        <button type="submit">ลงชื่อเข้าเรียน</button>
     </form>
 
     <?php if ($attendance): ?>
         <div class="card">
             <p class="progress">
-                Progress: <?= $attendance['completed_count'] ?> / <?= $attendance['conducted_count'] ?>
+                ความก้าวหน้า: <?= $attendance['completed_count'] ?> / <?= $attendance['conducted_count'] ?>
                 (<?= $attendance['percent'] ?>%)
             </p>
             <div class="session-grid">
@@ -177,7 +182,7 @@ foreach ($classes as $class) {
             const sessionSelect = document.getElementById('session_id');
             const sessions = SESSIONS_BY_CLASS[classSelect.value] || [];
 
-            sessionSelect.innerHTML = '<option value="">-- Select session --</option>';
+            sessionSelect.innerHTML = '<option value="">-- เลือกครั้งที่ --</option>';
             sessions.forEach(function (session) {
                 const option = document.createElement('option');
                 option.value = session.id;

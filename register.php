@@ -3,6 +3,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/rate_limit.php';
 require_once __DIR__ . '/includes/csrf.php';
+require_once __DIR__ . '/includes/input.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: index.php');
@@ -14,30 +15,30 @@ verifyCsrf();
 $ip = getClientIp();
 
 if (!checkRateLimit('register', $ip)) {
-    header('Location: index.php?error=' . urlencode('Too many attempts. Please try again later.'));
+    header('Location: index.php?error=' . urlencode('มีการลองหลายครั้งเกินไป กรุณาลองใหม่ภายหลัง'));
     exit;
 }
 
 recordRateLimitHit('register', $ip);
 
 $prefix = trim($_POST['prefix'] ?? '');
-$prefixOther = trim($_POST['prefix_other'] ?? '');
-$fullName = trim($_POST['full_name'] ?? '');
+$prefixOther = cleanText($_POST['prefix_other'] ?? '');
+$fullName = cleanText($_POST['full_name'] ?? '');
 $age = trim($_POST['age'] ?? '');
-$address = trim($_POST['address'] ?? '');
-$phone = trim($_POST['phone'] ?? '');
-$lineId = trim($_POST['line_id'] ?? '');
-$referencePerson = trim($_POST['reference_person'] ?? '');
+$address = cleanMultilineText($_POST['address'] ?? '');
+$phone = cleanText($_POST['phone'] ?? '');
+$lineId = cleanText($_POST['line_id'] ?? '');
+$referencePerson = cleanText($_POST['reference_person'] ?? '');
 
 $allowedPrefixes = ['พระ', 'สิกขามานา', 'สามเณร', 'สามเณรี', 'แม่ชี', 'นาย', 'นาง', 'นางสาว', 'อื่นๆ'];
 
 if (!in_array($prefix, $allowedPrefixes, true) || $fullName === '' || $phone === '') {
-    header('Location: index.php?error=' . urlencode('Please fill in all required fields.'));
+    header('Location: index.php?error=' . urlencode('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน'));
     exit;
 }
 
 if ($prefix === 'อื่นๆ' && $prefixOther === '') {
-    header('Location: index.php?error=' . urlencode('Please specify the prefix.'));
+    header('Location: index.php?error=' . urlencode('กรุณาระบุคำนำหน้า'));
     exit;
 }
 
@@ -48,7 +49,7 @@ $batch = $mysqli->query(
 )->fetch_assoc();
 
 if (!$batch) {
-    header('Location: index.php?error=' . urlencode('Registration is currently closed.'));
+    header('Location: index.php?error=' . urlencode('ขณะนี้ปิดรับลงทะเบียน'));
     exit;
 }
 

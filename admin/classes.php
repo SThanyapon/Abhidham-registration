@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/input.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/date_helpers.php';
 
@@ -39,16 +40,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'create_batch') {
         $batchNo = (int) ($_POST['batch_no'] ?? 0);
-        $name = trim($_POST['name'] ?? '');
+        $name = cleanText($_POST['name'] ?? '');
 
         if ($batchNo <= 0) {
-            $error = 'Batch number is required.';
+            $error = 'กรุณาระบุรุ่นที่';
         } else {
             $stmt = $mysqli->prepare('INSERT INTO batches (batch_no, name) VALUES (?, ?)');
             $stmt->bind_param('is', $batchNo, $name);
             $stmt->execute();
             $stmt->close();
-            $notice = "Batch $batchNo created.";
+            $notice = "เปิดรุ่นที่ $batchNo เรียบร้อยแล้ว";
         }
     } elseif ($action === 'toggle_registration') {
         $batchId = (int) ($_POST['batch_id'] ?? 0);
@@ -56,14 +57,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param('i', $batchId);
         $stmt->execute();
         $stmt->close();
-        $notice = 'Registration status updated.';
+        $notice = 'อัปเดตสถานะการลงทะเบียนเรียบร้อยแล้ว';
     } elseif ($action === 'create_class_instance') {
         $batchId = (int) ($_POST['batch_id'] ?? 0);
         $classLevelId = (int) ($_POST['class_level_id'] ?? 0);
         $startDate = $_POST['start_date'] ?? '';
 
         if ($batchId <= 0 || $classLevelId <= 0 || $startDate === '') {
-            $error = 'Batch, class level, and start date are required.';
+            $error = 'กรุณาระบุรุ่น ระดับชั้น และวันที่เริ่มเรียน';
         } else {
             $stmt = $mysqli->prepare(
                 'INSERT INTO class_instances (batch_id, class_level_id, start_date) VALUES (?, ?, ?)'
@@ -71,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->bind_param('iis', $batchId, $classLevelId, $startDate);
             $stmt->execute();
             $stmt->close();
-            $notice = 'Class created.';
+            $notice = 'สร้างห้องเรียนเรียบร้อยแล้ว';
         }
     } elseif ($action === 'generate_schedule') {
         $classInstanceId = (int) ($_POST['class_instance_id'] ?? 0);
@@ -80,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $daysOfWeek = array_map('intval', $_POST['days_of_week'] ?? []);
 
         if ($classInstanceId <= 0 || $startDate === '' || $numberOfSessions <= 0 || $daysOfWeek === []) {
-            $error = 'Class, start date, number of sessions, and days of week are required.';
+            $error = 'กรุณาระบุชั้นเรียน วันที่เริ่มเรียน จำนวนครั้ง และวันเรียน';
         } else {
             $existingMax = $mysqli->prepare(
                 'SELECT COALESCE(MAX(session_number), 0) AS max_num FROM sessions WHERE class_instance_id = ?'
@@ -101,7 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $insert->execute();
             }
             $insert->close();
-            $notice = count($dates) . ' session(s) scheduled.';
+            $notice = 'สร้างตารางเรียนแล้ว ' . count($dates) . ' ครั้ง';
         }
     } elseif ($action === 'update_session') {
         $sessionId = (int) ($_POST['session_id'] ?? 0);
@@ -111,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param('ii', $isCancelled, $sessionId);
         $stmt->execute();
         $stmt->close();
-        $notice = 'Session updated.';
+        $notice = 'บันทึกตารางเรียนเรียบร้อยแล้ว';
     }
 }
 
@@ -148,10 +149,14 @@ $dayLabels = [
 ];
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>การจัดการชั้นเรียนและตารางเรียน</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap">
+    <title>การจัดการชั้นเรียนและตารางเรียน - ระบบลงทะเบียนอภิธรรม</title>
     <link rel="stylesheet" href="../assets/style.css">
 </head>
 <body>
@@ -165,7 +170,7 @@ $dayLabels = [
     <?php if ($error): ?><p class="error"><?= htmlspecialchars($error) ?></p><?php endif; ?>
 
     <h2>รุ่นที่เปิดสอน</h2>
-    <table>
+    <div class="table-wrap"><table>
         <thead>
             <tr><th>รุ่นที่</th><th>ชื่อรุ่น</th><th>สถานการลงทะเบียน</th><th></th></tr>
         </thead>
@@ -176,17 +181,17 @@ $dayLabels = [
                     <td><?= htmlspecialchars($batch['name'] ?? '') ?></td>
                     <td><?= $batch['registration_open'] ? 'เปิดลงทะเบียน' : 'ยังไม่เปิดลงทะเบียน' ?></td>
                     <td>
-                        <form action="classes.php" method="post" style="display:inline; box-shadow:none; padding:0; background:none;">
+                        <form action="classes.php" method="post" class="inline-form">
                             <?= csrfField() ?>
                             <input type="hidden" name="action" value="toggle_registration">
                             <input type="hidden" name="batch_id" value="<?= $batch['id'] ?>">
-                            <button type="submit" class="secondary"><?= $batch['registration_open'] ? 'Close' : 'Open' ?></button>
+                            <button type="submit" class="secondary"><?= $batch['registration_open'] ? 'ปิดรับลงทะเบียน' : 'เปิดรับลงทะเบียน' ?></button>
                         </form>
                     </td>
                 </tr>
             <?php endforeach; ?>
         </tbody>
-    </table>
+    </table></div>
 
     <form action="classes.php" method="post">
         <?= csrfField() ?>
@@ -194,12 +199,12 @@ $dayLabels = [
         <label for="batch_no">รุ่นที่เปิดใหม่</label>
         <input type="number" id="batch_no" name="batch_no" required>
         <label for="name">ชื่อรุ่นที่เปิดใหม่</label>
-        <input type="text" id="name" name="name" placeholder="e.g. รุ่น 7 ฉัฏฐญาณะ">
+        <input type="text" id="name" name="name" placeholder="เช่น รุ่น 7 ฉัฏฐญาณะ">
         <button type="submit">เปิดรุ่นใหม่</button>
     </form>
 
     <h2>ห้องเรียน</h2>
-    <table>
+    <div class="table-wrap"><table>
         <thead>
             <tr><th>รุ่นที่</th><th>ระดับ</th><th>วันที่เริ่มเรียน</th><th></th></tr>
         </thead>
@@ -213,7 +218,7 @@ $dayLabels = [
                 </tr>
             <?php endforeach; ?>
         </tbody>
-    </table>
+    </table></div>
 
     <form action="classes.php" method="post">
         <?= csrfField() ?>
@@ -232,7 +237,7 @@ $dayLabels = [
         </select>
         <label for="start_date">วันที่เริ่มเรียน</label>
         <input type="date" id="start_date" name="start_date" required>
-        <button type="submit">Create class</button>
+        <button type="submit">สร้างห้องเรียน</button>
     </form>
 
     <?php if ($selectedClassId > 0): ?>
@@ -252,13 +257,13 @@ $dayLabels = [
             <label>วันเรียน</label>
             <div>
                 <?php foreach ($dayLabels as $num => $label): ?>
-                    <label style="font-weight:normal; display:inline-block; margin-right:8px;">
+                    <label class="checkbox-label">
                         <input type="checkbox" name="days_of_week[]" value="<?= $num ?>"> <?= $label ?>
                     </label>
                 <?php endforeach; ?>
             </div>
 
-            <button type="submit">Generate schedule</button>
+            <button type="submit">สร้างตารางเรียน</button>
         </form>
 
         <div class="session-table">
@@ -278,7 +283,7 @@ $dayLabels = [
                     <span>#<?= $session['session_number'] ?></span>
                     <span><?= htmlspecialchars(dayOfWeekLabel($session['session_date'], $dayLabels)) ?></span>
                     <span><?= htmlspecialchars(formatDateBEShort($session['session_date'])) ?></span>
-                    <label style="font-weight:normal; margin:0;">
+                    <label class="checkbox-label">
                         <input type="checkbox" name="is_cancelled" <?= $session['is_cancelled'] ? 'checked' : '' ?>> ยกเลิกตารางเรียน
                     </label>
                     <button type="submit" class="secondary">บันทึก</button>

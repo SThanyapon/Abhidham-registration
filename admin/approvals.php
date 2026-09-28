@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/input.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/student_id.php';
 
@@ -24,9 +25,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param('i', $studentId);
         $stmt->execute();
         $stmt->close();
-        $notice = 'Student rejected.';
+        $notice = 'ไม่อนุมัตินักศึกษาเรียบร้อยแล้ว';
     } elseif ($action === 'approve') {
-        $override = trim($_POST['override_student_no'] ?? '');
+        $override = cleanCode($_POST['override_student_no'] ?? '');
 
         $stmt = $mysqli->prepare('SELECT prefix, batch_id FROM students WHERE id = ? AND status = "pending"');
         $stmt->bind_param('i', $studentId);
@@ -35,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->close();
 
         if (!$student) {
-            $error = 'Student not found or already processed.';
+            $error = 'ไม่พบนักศึกษา หรือได้ดำเนินการไปแล้ว';
         } else {
             $batchRow = $mysqli->query(
                 'SELECT batch_no FROM batches WHERE id = ' . (int) $student['batch_id']
@@ -52,10 +53,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $update->bind_param('sii', $studentNo, $firstLevel['id'], $studentId);
                 $update->execute();
                 $update->close();
-                $notice = "Student approved with ID $studentNo.";
+                $notice = "อนุมัตินักศึกษาเรียบร้อย รหัสนักศึกษา $studentNo";
             } catch (mysqli_sql_exception $e) {
-                $error = "Could not assign ID '$studentNo' (it may already be in use). "
-                    . 'Please retry with a manually specified ID.';
+                $error = "ไม่สามารถกำหนดรหัส '$studentNo' ได้ (อาจมีผู้ใช้รหัสนี้แล้ว) "
+                    . 'กรุณาลองใหม่โดยกำหนดรหัสเอง';
             }
         }
     }
@@ -71,10 +72,14 @@ $pending = $mysqli->query(
 )->fetch_all(MYSQLI_ASSOC);
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title> อนุมัติการลงทะเบียน</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap">
+    <title>อนุมัติการลงทะเบียน - ระบบลงทะเบียนอภิธรรม</title>
     <link rel="stylesheet" href="../assets/style.css">
 </head>
 <body>
@@ -104,16 +109,16 @@ $pending = $mysqli->query(
                 ผู้แนะนำ: <?= htmlspecialchars($student['reference_person'] ?? '-') ?>
             </p>
 
-            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                <form action="approvals.php" method="post" style="flex-direction:row; align-items:center; gap:8px; background:none; box-shadow:none; padding:0; margin:0;">
+            <div class="action-row">
+                <form action="approvals.php" method="post" class="inline-form">
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="approve">
                     <input type="hidden" name="student_id" value="<?= $student['id'] ?>">
-                    <label style="font-weight:normal;"> กำหนดรหัสนักศึกษาเอง (optional)</label>
+                    <label class="checkbox-label">กำหนดรหัสนักศึกษาเอง (ไม่บังคับ)</label>
                     <input type="text" name="override_student_no" placeholder="กำหนดอัตโนมัติ">
                     <button type="submit">อนุมัติ</button>
                 </form>
-                <form action="approvals.php" method="post" style="display:inline; box-shadow:none; padding:0; background:none; margin:0;">
+                <form action="approvals.php" method="post" class="inline-form">
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="reject">
                     <input type="hidden" name="student_id" value="<?= $student['id'] ?>">

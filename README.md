@@ -29,7 +29,7 @@ data model and feature design derived from the original requirements.
    php -S localhost:8000
    ```
 5. Open `http://localhost:8000`:
-   - `/` — landing page; click "Register" (or visit `/?register=1`) to open the
+   - `/` — landing page; click "ลงทะเบียน" (Register) (or visit `/?register=1`) to open the
      registration form
    - `/checkin.php` — class check-in
    - `/lookup.php` — student ID lookup

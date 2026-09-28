@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $studentIds = array_map('intval', $_POST['student_ids'] ?? []);
 
     if ($studentIds === []) {
-        $error = 'No students selected.';
+        $error = 'ยังไม่ได้เลือกนักศึกษา';
     } else {
         $promoted = 0;
         $skipped = 0;
@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $promoted++;
         }
 
-        $notice = "$promoted student(s) promoted." . ($skipped > 0 ? " $skipped skipped (already at highest level or not approved)." : '');
+        $notice = "เลื่อนชั้นนักศึกษาแล้ว $promoted คน" . ($skipped > 0 ? " ข้าม $skipped คน (อยู่ระดับสูงสุดแล้วหรือยังไม่ได้รับการอนุมัติ)" : '');
     }
 }
 
@@ -79,17 +79,21 @@ $students = $mysqli->query(
 )->fetch_all(MYSQLI_ASSOC);
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>Promote Students - Abhidham Registration</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap">
+    <title>เลื่อนชั้นนักศึกษา - ระบบลงทะเบียนอภิธรรม</title>
     <link rel="stylesheet" href="../assets/style.css">
 </head>
 <body>
-    <h1>Promote Students</h1>
+    <h1>เลื่อนชั้นนักศึกษา</h1>
     <nav>
-        <a href="dashboard.php">Dashboard</a>
-        <a href="logout.php">Log out</a>
+        <a href="dashboard.php">กลับหน้าแผงควบคุม</a>
+        <a href="logout.php">ออกจากระบบ</a>
     </nav>
 
     <?php if ($notice): ?><p class="success"><?= htmlspecialchars($notice) ?></p><?php endif; ?>
@@ -97,9 +101,9 @@ $students = $mysqli->query(
 
     <form action="promotions.php" method="post">
         <?= csrfField() ?>
-        <table>
+        <div class="table-wrap"><table>
             <thead>
-                <tr><th></th><th>Student ID</th><th>Name</th><th>รุ่น</th><th>Current level</th></tr>
+                <tr><th></th><th>รหัสนักศึกษา</th><th>ชื่อ-นามสกุล</th><th>รุ่น</th><th>ระดับชั้นปัจจุบัน</th></tr>
             </thead>
             <tbody>
                 <?php foreach ($students as $student): ?>
@@ -112,8 +116,8 @@ $students = $mysqli->query(
                     </tr>
                 <?php endforeach; ?>
             </tbody>
-        </table>
-        <button type="submit">Promote selected to next level</button>
+        </table></div>
+        <button type="submit">เลื่อนชั้นนักศึกษาที่เลือกไปยังระดับถัดไป</button>
     </form>
 </body>
 </html>

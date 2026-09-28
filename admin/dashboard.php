@@ -13,10 +13,14 @@ $features = array_map('intval', array_column($stmt->get_result()->fetch_all(MYSQ
 $stmt->close();
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title> ส่วนสำหรับผู้ดูแลระบบ </title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap">
+    <title>แผงควบคุม - ระบบลงทะเบียนอภิธรรม</title>
     <link rel="stylesheet" href="../assets/style.css">
 </head>
 <body>
@@ -27,7 +31,7 @@ $stmt->close();
 
     <div class="card feature-links">
         <?php if (in_array(1, $features, true)): ?>
-            <a href="classes.php">1) จัดการชั้นเรียน และตารางเรียน </a>
+            <a href="classes.php">1) จัดการชั้นเรียนและตารางเรียน</a>
         <?php endif; ?>
         <?php if (in_array(2, $features, true)): ?>
             <a href="approvals.php">2) อนุมัติการลงทะเบียน</a>

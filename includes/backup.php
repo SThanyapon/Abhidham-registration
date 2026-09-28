@@ -54,9 +54,9 @@ function runBackup(string $triggeredBy): array
     $recipient = $config['backup']['recipient_email'];
     $emailed = sendEmail(
         $recipient,
-        "Database backup - $filename",
-        "A database backup was created and saved on the server at:\n$filePath\n\n"
-            . "(This notification does not include the file as an attachment.)"
+        "สำรองฐานข้อมูล - $filename",
+        "ระบบได้สำรองฐานข้อมูลและบันทึกไว้บนเซิร์ฟเวอร์ที่:\n$filePath\n\n"
+            . "(อีเมลแจ้งเตือนนี้ไม่ได้แนบไฟล์สำรองข้อมูลมาด้วย)"
     );
 
     $stmt = $mysqli->prepare(

@@ -82,7 +82,7 @@ if ($exportCsv) {
     fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel renders Thai text correctly
 
     if ($selectedStudent) {
-        fputcsv($out, ['Student ID', 'Name', 'Batch', 'Level']);
+        fputcsv($out, ['รหัสนักศึกษา', 'ชื่อ-นามสกุล', 'รุ่น', 'ระดับชั้น']);
         fputcsv($out, [
             $selectedStudent['student_no'] ?? '-',
             $selectedStudent['full_name'],
@@ -90,16 +90,16 @@ if ($exportCsv) {
             $selectedStudent['level_name'],
         ]);
         fputcsv($out, []);
-        fputcsv($out, ['Session number', 'Session date', 'Checked in']);
+        fputcsv($out, ['ครั้งที่', 'วันที่เรียน', 'ลงชื่อเข้าเรียน']);
         foreach (($singleReport['sessions'] ?? []) as $session) {
             fputcsv($out, [
                 $session['session_number'],
                 $session['session_date'],
-                $session['checked_in'] ? 'Yes' : 'No',
+                $session['checked_in'] ? 'ใช่' : 'ไม่ใช่',
             ]);
         }
     } else {
-        fputcsv($out, ['Student ID', 'Name', 'Batch', 'Level', 'Completed', 'Conducted', 'Percent']);
+        fputcsv($out, ['รหัสนักศึกษา', 'ชื่อ-นามสกุล', 'รุ่น', 'ระดับชั้น', 'เข้าเรียน (ครั้ง)', 'จัดสอนแล้ว (ครั้ง)', 'ร้อยละ']);
         foreach ($allReports as $row) {
             $s = $row['student'];
             $summary = $row['summary'];
@@ -122,39 +122,43 @@ if ($exportCsv) {
 $exportHref = 'reports.php?export=csv' . ($selectedStudentId > 0 ? '&student_id=' . $selectedStudentId : '');
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>Reports - Abhidham Registration</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap">
+    <title>รายงานการเข้าเรียน - ระบบลงทะเบียนอภิธรรม</title>
     <link rel="stylesheet" href="../assets/style.css">
 </head>
 <body>
-    <h1>Attendance Reports</h1>
+    <h1>รายงานการเข้าเรียน</h1>
     <nav>
-        <a href="dashboard.php">Dashboard</a>
-        <a href="logout.php">Log out</a>
+        <a href="dashboard.php">กลับหน้าแผงควบคุม</a>
+        <a href="logout.php">ออกจากระบบ</a>
     </nav>
 
     <form action="reports.php" method="get">
-        <label for="student_id">Student</label>
+        <label for="student_id">นักศึกษา</label>
         <select id="student_id" name="student_id" onchange="this.form.submit()">
-            <option value="0" <?= $selectedStudentId === 0 ? 'selected' : '' ?>>-- All students --</option>
+            <option value="0" <?= $selectedStudentId === 0 ? 'selected' : '' ?>>-- นักศึกษาทั้งหมด --</option>
             <?php foreach ($students as $student): ?>
                 <option value="<?= $student['id'] ?>" <?= $selectedStudentId === (int) $student['id'] ? 'selected' : '' ?>>
                     <?= htmlspecialchars(($student['student_no'] ?? '-') . ' - ' . $student['full_name']) ?>
                 </option>
             <?php endforeach; ?>
         </select>
-        <button type="submit">View</button>
+        <button type="submit">ดูรายงาน</button>
     </form>
 
-    <p><a href="<?= htmlspecialchars($exportHref) ?>">Export this report to CSV</a></p>
+    <p><a href="<?= htmlspecialchars($exportHref) ?>">ส่งออกรายงานนี้เป็นไฟล์ CSV</a></p>
 
     <?php if ($selectedStudentId > 0): ?>
         <?php if (!$selectedStudent): ?>
-            <p class="error">Student not found.</p>
+            <p class="error">ไม่พบนักศึกษา</p>
         <?php elseif (!$singleReport): ?>
-            <p class="error">No class schedule found yet for this student's current level.</p>
+            <p class="error">ยังไม่มีตารางเรียนสำหรับระดับชั้นปัจจุบันของนักศึกษาคนนี้</p>
         <?php else: ?>
             <div class="card">
                 <p>
@@ -163,7 +167,7 @@ $exportHref = 'reports.php?export=csv' . ($selectedStudentId > 0 ? '&student_id=
                     / <?= htmlspecialchars($selectedStudent['level_name']) ?>
                 </p>
                 <p class="progress">
-                    Progress: <?= $singleReport['completed_count'] ?> / <?= $singleReport['conducted_count'] ?>
+                    ความก้าวหน้า: <?= $singleReport['completed_count'] ?> / <?= $singleReport['conducted_count'] ?>
                     (<?= $singleReport['percent'] ?>%)
                 </p>
                 <div class="session-grid">
@@ -177,9 +181,9 @@ $exportHref = 'reports.php?export=csv' . ($selectedStudentId > 0 ? '&student_id=
             </div>
         <?php endif; ?>
     <?php else: ?>
-        <table>
+        <div class="table-wrap"><table>
             <thead>
-                <tr><th>Student ID</th><th>Name</th><th>รุ่น</th><th>Level</th><th>Completed</th><th>%</th></tr>
+                <tr><th>รหัสนักศึกษา</th><th>ชื่อ-นามสกุล</th><th>รุ่น</th><th>ระดับชั้น</th><th>เข้าเรียน</th><th>%</th></tr>
             </thead>
             <tbody>
                 <?php foreach ($allReports as $row): $s = $row['student']; $summary = $row['summary']; ?>
@@ -193,7 +197,7 @@ $exportHref = 'reports.php?export=csv' . ($selectedStudentId > 0 ? '&student_id=
                     </tr>
                 <?php endforeach; ?>
             </tbody>
-        </table>
+        </table></div>
     <?php endif; ?>
 </body>
 </html>

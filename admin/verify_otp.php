@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/input.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/otp.php';
 require_once __DIR__ . '/../includes/rate_limit.php';
@@ -20,11 +21,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
 
     if (!checkRateLimit('otp_verify', (string) $pendingAdminId)) {
-        $error = 'Too many attempts. Please try again later.';
+        $error = 'มีการลองหลายครั้งเกินไป กรุณาลองใหม่ภายหลัง';
     } else {
         recordRateLimitHit('otp_verify', (string) $pendingAdminId);
 
-        $code = trim($_POST['code'] ?? '');
+        $code = cleanCode($_POST['code'] ?? '');
 
         if (verifyOtp((int) $pendingAdminId, $code)) {
             loginAdmin((int) $pendingAdminId);
@@ -32,20 +33,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        $error = 'Invalid or expired code.';
+        $error = 'รหัสไม่ถูกต้องหรือหมดอายุแล้ว';
     }
 }
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>Verify Code - Abhidham Registration</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap">
+    <title>ยืนยันรหัส - ระบบลงทะเบียนอภิธรรม</title>
     <link rel="stylesheet" href="../assets/style.css">
 </head>
 <body>
-    <h1>Enter your login code</h1>
-    <p>We emailed a 6-digit code to your registered email address.</p>
+    <h1>กรอกรหัสยืนยันการเข้าสู่ระบบ</h1>
+    <p>ระบบได้ส่งรหัส 6 หลักไปยังอีเมลที่คุณลงทะเบียนไว้แล้ว</p>
 
     <?php if ($error): ?>
         <p class="error"><?= htmlspecialchars($error) ?></p>
@@ -53,9 +58,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <form action="verify_otp.php" method="post">
         <?= csrfField() ?>
-        <label for="code">Code</label>
+        <label for="code">รหัสยืนยัน</label>
         <input type="text" id="code" name="code" maxlength="6" required>
-        <button type="submit">Verify</button>
+        <button type="submit">ยืนยัน</button>
     </form>
 </body>
 </html>

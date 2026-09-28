@@ -158,11 +158,14 @@ CREATE TABLE backup_runs (
 ## 4. Public features
 
 ### 4.1 Student registration (`index.php`, `register.php`)
-`index.php` is a landing page — the form is not shown until the visitor clicks "Register"
+`index.php` is a landing page — the form is not shown until the visitor clicks "ลงทะเบียน"
 (`?register=1`), so a first-time visit doesn't drop straight into a form. Fields: prefix
 (dropdown incl. "อื่นๆ (ระบุ)" free-text), name-surname, age, address, phone, line ID,
 reference person (optional). Always targets whichever batch currently has
 `registration_open = TRUE` at level `จูฬตรี`. Inserted as `status = 'pending'`. Rate-limited.
+Text fields are whitespace-normalized before storage (trimmed, internal runs collapsed to one
+space; see `includes/input.php`), and the same normalization is applied to the name typed at
+check-in/lookup, so extra spaces never cause a name mismatch.
 
 ### 4.2 Check-in (`checkin.php`)
 Student enters name-surname + student ID + class, then **selects the ครั้งที่ (session)
@@ -242,7 +245,7 @@ exam and advance `current_class_level_id` to the next level per the fixed progre
 in `class_levels.sort_order`; every promotion is logged in `promotions`.
 
 ### Feature 5 — Backup
-Manual "Backup now" action plus a scheduled job (Windows Task Scheduler / cron calling
+Manual "สำรองข้อมูลตอนนี้" (backup now) action plus a scheduled job (Windows Task Scheduler / cron calling
 `cron/backup.php`) that dumps the database to a timestamped `.sql` text file and emails it
 to a configured recipient. Schedule and recipient are configurable in `config.local.php`.
 
@@ -313,7 +316,7 @@ to a configured recipient. Schedule and recipient are configurable in `config.lo
    Underlying storage stays Gregorian ISO (`DATE` columns); conversion only happens at
    display time (`formatDateBEShort()` in `includes/date_helpers.php`).
 7. **Registration landing page** — `index.php` shows a landing page first; the registration
-   form only appears after the visitor clicks "Register" (`?register=1`), rather than being
+   form only appears after the visitor clicks "ลงทะเบียน" (`?register=1`), rather than being
    shown immediately on first load.
 
 ## 9. Resolved decisions since initial design

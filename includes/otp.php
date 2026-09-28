@@ -22,8 +22,8 @@ function generateAndSendOtp(int $adminUserId, string $email): bool
 
     return sendEmail(
         $email,
-        'Your login code',
-        "Your one-time login code is: $code\nIt expires in $minutes minute(s)."
+        'รหัสเข้าสู่ระบบของคุณ',
+        "รหัสเข้าสู่ระบบแบบใช้ครั้งเดียวของคุณคือ: $code\nรหัสนี้จะหมดอายุภายใน $minutes นาที"
     );
 }
 
