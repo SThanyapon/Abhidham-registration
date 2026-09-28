@@ -5,7 +5,8 @@ data model, feature breakdown, and folder structure for the PHP + MySQL implemen
 
 ## 1. Actors
 
-- **Student (public, no login)** — registers, checks in to sessions, looks up their own student ID.
+- **Student (public, no login)** — registers, checks in to sessions (or just views their attendance
+  progress), and looks up their own student ID / registration status.
 - **Admin/Staff (OTP login required)** — manages classes & schedules, approves enrollments,
   runs attendance reports, promotes students, and runs backups. Access to each of the 5 backend
   features is granted per-user (not all admins can do all 5 things).
@@ -160,7 +161,8 @@ CREATE TABLE backup_runs (
 ### 4.1 Student registration (`index.php`, `register.php`)
 `index.php` is a landing page — the form is not shown until the visitor clicks "ลงทะเบียน"
 (`?register=1`), so a first-time visit doesn't drop straight into a form. Fields: prefix
-(dropdown incl. "อื่นๆ (ระบุ)" free-text), name-surname, age, address, phone, line ID,
+(dropdown starting on a "-- เลือกคำนำหน้า --" placeholder so the choice is explicit, incl.
+"อื่นๆ (ระบุ)" free-text), name-surname, age, address, phone, line ID,
 reference person. **Required** (marked `*`, enforced client- and server-side): prefix (plus the
 free-text prefix when "อื่นๆ"), name-surname, age (integer 1-120), address, phone (digits/spaces/
 `-`/`+`, 9-15 digits). Name-surname may contain only Thai letters/vowels/tone marks/digits, English
@@ -175,20 +177,22 @@ check-in/lookup, so extra spaces never cause a name mismatch.
 
 ### 4.2 Check-in (`checkin.php`)
 Menu caption "ลงชื่อ/ตรวจสอบการเข้าเรียน" — the page both records attendance and shows progress.
-Student enters name-surname + student ID (**required**, marked `*`), and optionally a class and
-then **selects the ครั้งที่ (session) themselves** from a dropdown of that class's sessions, shown
-in short Thai Buddhist Era date format (e.g. `17 ก.ย. 69`; no auto-detection by date). System:
-1. Verifies name + ID match an approved student, and finds their current class instance
-   (`studentClassInstanceId()`, batch + current level).
+Student enters student ID, then name-surname (both **required**, marked `*`; the ID comes first
+since students remember it more reliably than the exact registered spelling of their name), and
+optionally a class and then **selects the ครั้งที่ (session) themselves** from a dropdown of that
+class's sessions, shown in short Thai Buddhist Era date format (e.g. `17 ก.ย. 69`; no
+auto-detection by date). System:
+1. Verifies ID + name match an approved student, and finds their current class instance
+   (`studentClassInstanceId()`, batch + current level). No class instance yet → a notice, no grid.
 2. **Check-in mode** (class and session both chosen): the class must be the student's current
    class; if already checked in for that session → error; otherwise insert into `checkins` and
    confirm "ลงชื่อเข้าเรียนเรียบร้อยแล้ว".
 3. **View-only mode** (class or session missing): nothing is written; a notice explains that only
    progress is shown.
-4. In both modes, render the student's คำนำหน้า / ชื่อ-นามสกุล / รหัสนักศึกษา, then a grid of all
-   sessions so far for their current class: green = checked in, grey = missing. Name, ID and
+4. In both modes, render the student's รหัสนักศึกษา / คำนำหน้า / ชื่อ-นามสกุล, then a grid of all
+   sessions so far for their current class: green = checked in, grey = missing. ID, name and
    class are refilled after submitting.
-4. `% complete = checkins / (count of sessions whose date <= the most recent past session's
+5. `% complete = checkins / (count of sessions whose date <= the most recent past session's
    date)` — i.e. only sessions already conducted count toward the denominator, not future
    scheduled ones.
 Rate-limited.
@@ -251,17 +255,34 @@ beyond that point (already supported via override + the `UNIQUE` constraint on
 `student_no`). In practice this is expected only for the นาย/นาง/นางสาว/อื่นๆ group.
 
 ### Feature 3 — Reports
-Restricted to admins with feature 3 permission (`admin/reports.php`). Attendance report for
-either a single selected student or all approved students at once:
+Restricted to admins with feature 3 permission (`admin/reports.php`). A toggle at the top
+switches between two views (`?view=approved|rejected`, default `approved`):
+
+**นักศึกษาที่อนุมัติแล้ว (approved)** — attendance report for either a single selected student or
+all approved students at once:
 - **Single student** — the same per-session grid and % complete shown after check-in
   (`includes/attendance.php`'s `getAttendanceSummary()`, reused as-is), plus the student's
-  batch/level.
-- **All students** (default view) — one row per approved student with completed/conducted
-  counts and % complete against their own current class instance; students whose level has no
-  `class_instance` yet (schedule not generated) show `-` instead of a percentage.
-- Both views can be exported to CSV (`?export=csv`, carries the current student selection) —
-  session-by-session for a single student, summary table for all students. UTF-8 BOM-prefixed
-  so Thai text renders correctly in Excel.
+  prefix, batch and level.
+- **All students** (default) — one row per approved student: รหัสนักศึกษา, คำนำหน้า,
+  ชื่อ-นามสกุล, รุ่น, ระดับชั้น, completed/conducted counts and % complete against their own
+  current class instance; students whose level has no `class_instance` yet (schedule not
+  generated) show `-`. Sorted by รหัสนักศึกษา ascending by default (numeric-aware: by length,
+  then value, so `7201 < 10101`); every column header is clickable to toggle ascending/descending
+  (`?sort=…&dir=asc|desc`, whitelisted). Stored columns sort in SQL; the computed attendance
+  columns sort in PHP. The student dropdown uses the same order.
+
+**ผู้สมัครที่ไม่ได้รับการอนุมัติ (rejected)** — every `status = 'rejected'` registration with
+คำนำหน้า, ชื่อ-นามสกุล, รุ่น, อายุ, เบอร์โทรศัพท์, Line ID, ผู้แนะนำ and วันที่สมัคร (BE short
+date). Sortable by prefix/name/batch/date, newest first by default. Rejected rows have no
+`student_no` or `current_class_level_id`, so this view queries without the `class_levels` join.
+
+Every view can be exported to CSV (`?export=csv`, carrying the current view, sort and student
+selection) — session-by-session for a single student, the summary table for all students, or the
+rejected list. UTF-8 BOM-prefixed so Thai text renders correctly in Excel.
+
+Known limitation: MySQL's collation doesn't apply Thai leading-vowel ordering (e.g. แม่ชี sorts
+after สามเณร instead of by its consonant ม). Proper Thai collation would need PHP's `intl`
+extension, which the production VM doesn't have.
 
 ### Feature 4 — Promotion
 Restricted to admins with feature 4 permission. Select approved students who passed the
@@ -270,8 +291,10 @@ in `class_levels.sort_order`; every promotion is logged in `promotions`.
 
 ### Feature 5 — Backup
 Manual "สำรองข้อมูลตอนนี้" (backup now) action plus a scheduled job (Windows Task Scheduler / cron calling
-`cron/backup.php`) that dumps the database to a timestamped `.sql` text file and emails it
-to a configured recipient. Schedule and recipient are configurable in `config.local.php`.
+`cron/backup.php`) that dumps the database to a timestamped `.sql` text file on the server and
+emails a notification (with the file path, not the file itself — the mailer has no attachment
+support) to a configured recipient. The recipient and backup directory are configured in
+`config.local.php`; the schedule lives in the cron/Task Scheduler entry.
 
 ## 6. Security
 
@@ -289,22 +312,33 @@ to a configured recipient. Schedule and recipient are configurable in `config.lo
   the acting `admin_users.id` — already covered by `promoted_by` / `backup_runs.triggered_by`
   and worth extending to an audit log if the project grows.
 
-## 7. Proposed folder structure
+## 7. Folder structure
 
 ```
 /
 ├── config.local.php.example
 ├── config.php
 ├── schema.sql
-├── index.php            -> student registration
-├── checkin.php
-├── lookup.php
+├── index.php            -> landing page + registration form
+├── register.php         -> registration POST handler (validation, insert as pending)
+├── checkin.php          -> check-in / view attendance progress
+├── lookup.php           -> student ID + registration status lookup
 ├── includes/
 │   ├── db.php
-│   ├── auth.php          (admin session + permission checks)
+│   ├── auth.php            (admin session + permission checks)
+│   ├── csrf.php
 │   ├── otp.php
 │   ├── rate_limit.php
-│   └── date_helpers.php  (shared formatDateBEShort(), used by check-in and class management)
+│   ├── mailer.php          (minimal SMTP client)
+│   ├── student_id.php      (generateStudentNo(), see section 5)
+│   ├── attendance.php      (getAttendanceSummary(), see section 4.2)
+│   ├── backup.php          (runBackup())
+│   ├── input.php           (whitespace cleanup + name validation for user input)
+│   ├── student_helpers.php (studentPrefix(), studentClassInstanceId())
+│   └── date_helpers.php    (formatDateBEShort())
+├── scripts/
+│   ├── create_admin.php
+│   └── normalize_whitespace.php  (one-off cleanup of rows stored before input.php)
 ├── admin/
 │   ├── login.php
 │   ├── verify_otp.php
@@ -363,3 +397,17 @@ to a configured recipient. Schedule and recipient are configurable in `config.lo
   primary-key collision on admins who already hold both) when deploying this change to an
   existing database; a fresh `schema.sql` install is unaffected since it seeds no permission
   rows itself.
+- **Thai UI and light-blue theme** — every user-facing caption, message, CSV header and email is
+  in Thai (`lang="th"`, Sarabun font). The ผู้ดูแลระบบ link on public pages sits apart at the right
+  of the menu on a dark-blue background; ออกจากระบบ on admin pages sits at the right in red.
+- **Whitespace normalization** — all free-text input is trimmed and internal whitespace (incl.
+  non-breaking and zero-width spaces from Thai keyboards) collapsed, because check-in and lookup
+  match `full_name` by exact equality. `scripts/normalize_whitespace.php` cleaned rows stored
+  before this rule (it found none to change in production).
+- **Stricter registration validation** — required fields expanded to prefix, name, age, address
+  and phone, with format rules for age, phone and name (section 4.1).
+- **Lookup shows registration status** — originally approved-only; now also tells pending and
+  rejected applicants their status, to discourage duplicate registrations (section 4.3).
+- **Check-in doubles as a progress view** — class and session became optional; leaving either
+  out shows progress without recording attendance (section 4.2).
+- **Rejected applicants in reports** — added as a second report view (section 5, Feature 3).
