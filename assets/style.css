@@ -272,7 +272,8 @@ button.danger {
 /* Alerts */
 
 .error,
-.success {
+.success,
+.notice {
     padding: 12px 16px;
     border-radius: var(--radius-sm);
     border-left: 4px solid;
@@ -288,6 +289,12 @@ button.danger {
     color: #166534;
     background: #dcfce7;
     border-color: var(--success);
+}
+
+.notice {
+    color: #92400e;
+    background: #fef3c7;
+    border-color: #f59e0b;
 }
 
 /* Tables */

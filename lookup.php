@@ -6,7 +6,7 @@ require_once __DIR__ . '/includes/csrf.php';
 require_once __DIR__ . '/includes/input.php';
 
 $error = null;
-$studentNo = null;
+$result = null;
 $searched = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -23,15 +23,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fullName = cleanText($_POST['full_name'] ?? '');
 
         $mysqli = getDbConnection();
+        // A name may have several registrations (e.g. rejected, then re-registered); report the most
+        // relevant one: approved, then pending, then rejected, newest first.
         $stmt = $mysqli->prepare(
-            'SELECT student_no FROM students WHERE full_name = ? AND status = "approved"'
+            "SELECT student_no, status FROM students WHERE full_name = ?
+             ORDER BY FIELD(status, 'approved', 'pending', 'rejected'), created_at DESC
+             LIMIT 1"
         );
         $stmt->bind_param('s', $fullName);
         $stmt->execute();
-        $row = $stmt->get_result()->fetch_assoc();
+        $result = $stmt->get_result()->fetch_assoc();
         $stmt->close();
-
-        $studentNo = $row['student_no'] ?? null;
     }
 }
 ?>
@@ -67,10 +69,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </form>
 
     <?php if ($searched): ?>
-        <?php if ($studentNo): ?>
-            <p class="success">รหัสนักศึกษาของคุณ: <strong><?= htmlspecialchars($studentNo) ?></strong></p>
+        <?php
+        $nameLine = 'ชื่อ-นามสกุล: <strong>' . htmlspecialchars($fullName) . '</strong><br>';
+        ?>
+        <?php if ($result === null): ?>
+            <p class="error"><?= $nameLine ?>ไม่พบการลงทะเบียนของท่าน กรุณาทำการลงทะเบียนก่อนค่ะ</p>
+        <?php elseif ($result['status'] === 'approved'): ?>
+            <p class="success"><?= $nameLine ?>รหัสนักศึกษาของคุณ: <strong><?= htmlspecialchars($result['student_no'] ?? '-') ?></strong></p>
+        <?php elseif ($result['status'] === 'pending'): ?>
+            <p class="notice"><?= $nameLine ?>คุณได้ทำการลงทะเบียนแล้ว แต่ยังไม่ได้รับการตรวจสอบจากผู้ดูแลระบบ กรุณาตรวจสอบใหม่ภายหลัง และขอความร่วมมือไม่ลงทะเบียนซ้ำ</p>
         <?php else: ?>
-            <p class="error">ไม่พบนักศึกษาที่ได้รับการอนุมัติในชื่อนี้</p>
+            <p class="error"><?= $nameLine ?>คุณไม่ได้รับการอนุมัติการลงทะเบียน ขอบคุณค่ะ</p>
         <?php endif; ?>
     <?php endif; ?>
 </body>

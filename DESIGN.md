@@ -185,7 +185,17 @@ format (e.g. `17 ก.ย. 69`; no auto-detection by date). System:
 Rate-limited.
 
 ### 4.3 Student ID lookup (`lookup.php`)
-Name + surname → returns `student_no` for approved students only.
+Name + surname → looks up the registration in any status and shows a status-specific message
+(when a name has several registrations, the most relevant wins: approved, then pending, then
+rejected, newest first):
+- **approved** → shows `student_no`.
+- **pending** → "คุณได้ทำการลงทะเบียนแล้ว แต่ยังไม่ได้รับการตรวจสอบจากผู้ดูแลระบบ กรุณาตรวจสอบใหม่ภายหลัง
+  และขอความร่วมมือไม่ลงทะเบียนซ้ำ" (discourages duplicate registrations).
+- **rejected** → "คุณไม่ได้รับการอนุมัติการลงทะเบียน ขอบคุณค่ะ".
+- no match → "ไม่พบการลงทะเบียนของท่าน กรุณาทำการลงทะเบียนก่อนค่ะ".
+
+Every result also echoes the searched name (after whitespace normalization) as
+"ชื่อ-นามสกุล: …", so the user can spot a typo.
 
 ## 5. Admin/backend features
 
