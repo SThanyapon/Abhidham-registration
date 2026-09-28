@@ -107,6 +107,70 @@ nav a:hover {
     color: var(--primary-dark);
 }
 
+/* Pushed to the right end of the nav, apart from the regular links */
+nav a.nav-admin,
+nav a.nav-logout {
+    margin-left: auto;
+}
+
+nav a.nav-admin {
+    background: #1e3a8a;
+    color: #fff;
+}
+
+nav a.nav-admin:hover {
+    background: #172554;
+    color: #fff;
+}
+
+nav a.nav-logout {
+    color: var(--danger);
+}
+
+nav a.nav-logout:hover {
+    background: #fee2e2;
+    color: var(--danger-dark);
+}
+
+.required-mark {
+    color: var(--danger);
+    margin-left: 2px;
+}
+
+.field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.field-group[hidden] {
+    display: none;
+}
+
+.form-note {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+th a.sort-link {
+    color: inherit;
+    text-decoration: none;
+}
+
+th a.sort-link:hover {
+    text-decoration: underline;
+}
+
+.sort-indicator {
+    font-size: 0.8em;
+    margin-left: 4px;
+}
+
+.sort-indicator.inactive {
+    opacity: 0.35;
+}
+
 /* Forms and cards */
 
 form,

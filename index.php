@@ -1,6 +1,19 @@
 <?php
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/csrf.php';
+
+// Values from a failed submission (set by register.php), shown once to refill the form.
+ensureSessionStarted();
+$old = $_SESSION['register_old'] ?? [];
+unset($_SESSION['register_old']);
+
+$prefixes = ['พระ', 'สิกขามานา', 'สามเณร', 'สามเณรี', 'แม่ชี', 'นาย', 'นาง', 'นางสาว'];
+$oldPrefix = $old['prefix'] ?? '';
+
+function oldValue(array $old, string $key): string
+{
+    return htmlspecialchars($old[$key] ?? '');
+}
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -19,7 +32,7 @@ require_once __DIR__ . '/includes/csrf.php';
         <a href="index.php?register=1">ลงทะเบียน</a>
         <a href="checkin.php">ลงชื่อเข้าเรียน</a>
         <a href="lookup.php">ค้นหารหัสนักศึกษา</a>
-        <a href="admin/login.php">ผู้ดูแลระบบ</a>
+        <a class="nav-admin" href="admin/login.php">ผู้ดูแลระบบ</a>
     </nav>
 
     <?php
@@ -49,44 +62,53 @@ require_once __DIR__ . '/includes/csrf.php';
         <form action="register.php" method="post">
             <?= csrfField() ?>
 
-            <label for="prefix">คำนำหน้า</label>
-            <select id="prefix" name="prefix" onchange="document.getElementById('prefix_other_wrap').hidden = (this.value !== 'อื่นๆ')">
-                <option value="พระ">พระ</option>
-                <option value="สิกขามานา">สิกขามานา</option>
-                <option value="สามเณร">สามเณร</option>
-                <option value="สามเณรี">สามเณรี</option>
-                <option value="แม่ชี">แม่ชี</option>
-                <option value="นาย">นาย</option>
-                <option value="นาง">นาง</option>
-                <option value="นางสาว">นางสาว</option>
-                <option value="อื่นๆ">อื่นๆ (ระบุ)</option>
+            <p class="form-note"><span class="required-mark">*</span> จำเป็นต้องกรอก</p>
+
+            <label for="prefix">คำนำหน้า<span class="required-mark">*</span></label>
+            <select id="prefix" name="prefix" required onchange="togglePrefixOther()">
+                <option value="" <?= $oldPrefix === '' ? 'selected' : '' ?>>-- เลือกคำนำหน้า --</option>
+                <?php foreach ($prefixes as $p): ?>
+                    <option value="<?= $p ?>" <?= $oldPrefix === $p ? 'selected' : '' ?>><?= $p ?></option>
+                <?php endforeach; ?>
+                <option value="อื่นๆ" <?= $oldPrefix === 'อื่นๆ' ? 'selected' : '' ?>>อื่นๆ (ระบุ)</option>
             </select>
 
-            <div id="prefix_other_wrap" hidden>
-                <label for="prefix_other">โปรดระบุคำนำหน้า</label>
-                <input type="text" id="prefix_other" name="prefix_other">
+            <div id="prefix_other_wrap" class="field-group" <?= $oldPrefix === 'อื่นๆ' ? '' : 'hidden' ?>>
+                <label for="prefix_other">โปรดระบุคำนำหน้า<span class="required-mark">*</span></label>
+                <input type="text" id="prefix_other" name="prefix_other" value="<?= oldValue($old, 'prefix_other') ?>"
+                       <?= $oldPrefix === 'อื่นๆ' ? 'required' : '' ?>>
             </div>
 
-            <label for="full_name">ชื่อ-นามสกุล (ภาษาไทย)</label>
-            <input type="text" id="full_name" name="full_name" required>
+            <label for="full_name">ชื่อ-นามสกุล (ภาษาไทย)<span class="required-mark">*</span></label>
+            <input type="text" id="full_name" name="full_name" required value="<?= oldValue($old, 'full_name') ?>">
 
-            <label for="age">อายุ</label>
-            <input type="number" id="age" name="age" min="1" max="120">
+            <label for="age">อายุ<span class="required-mark">*</span></label>
+            <input type="number" id="age" name="age" min="1" max="120" required value="<?= oldValue($old, 'age') ?>">
 
-            <label for="address">ที่อยู่</label>
-            <textarea id="address" name="address" rows="3"></textarea>
+            <label for="address">ที่อยู่<span class="required-mark">*</span></label>
+            <textarea id="address" name="address" rows="3" required><?= oldValue($old, 'address') ?></textarea>
 
-            <label for="phone">เบอร์โทรศัพท์</label>
-            <input type="text" id="phone" name="phone" required>
+            <label for="phone">เบอร์โทรศัพท์<span class="required-mark">*</span></label>
+            <input type="tel" id="phone" name="phone" inputmode="tel" required
+                   pattern="\+?[0-9 \-]{9,20}" title="ตัวเลข 9-15 หลัก เช่น 081 234 5678"
+                   value="<?= oldValue($old, 'phone') ?>">
 
             <label for="line_id">Line ID</label>
-            <input type="text" id="line_id" name="line_id">
+            <input type="text" id="line_id" name="line_id" value="<?= oldValue($old, 'line_id') ?>">
 
             <label for="reference_person">ผู้แนะนำ (ถ้ามี)</label>
-            <input type="text" id="reference_person" name="reference_person">
+            <input type="text" id="reference_person" name="reference_person" value="<?= oldValue($old, 'reference_person') ?>">
 
             <button type="submit">ลงทะเบียน</button>
         </form>
+
+        <script>
+            function togglePrefixOther() {
+                const isOther = document.getElementById('prefix').value === 'อื่นๆ';
+                document.getElementById('prefix_other_wrap').hidden = !isOther;
+                document.getElementById('prefix_other').required = isOther;
+            }
+        </script>
     <?php endif; ?>
 </body>
 </html>

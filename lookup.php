@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <a href="index.php">ลงทะเบียน</a>
         <a href="checkin.php">ลงชื่อเข้าเรียน</a>
         <a href="lookup.php">ค้นหารหัสนักศึกษา</a>
-        <a href="admin/login.php">ผู้ดูแลระบบ</a>
+        <a class="nav-admin" href="admin/login.php">ผู้ดูแลระบบ</a>
     </nav>
 
     <?php if ($error): ?>

@@ -10,13 +10,37 @@ requireFeature($adminId, 3);
 
 $mysqli = getDbConnection();
 
+// Sortable columns for the all-students table: key => header label. Default: student ID ascending.
+$sortColumns = [
+    'student_no' => 'รหัสนักศึกษา',
+    'full_name' => 'ชื่อ-นามสกุล',
+    'batch' => 'รุ่น',
+    'level' => 'ระดับชั้น',
+    'completed' => 'เข้าเรียน',
+    'percent' => '%',
+];
+$sort = array_key_exists($_GET['sort'] ?? '', $sortColumns) ? $_GET['sort'] : 'student_no';
+$dir = ($_GET['dir'] ?? '') === 'desc' ? 'desc' : 'asc';
+
+// Student IDs are numeric strings of varying length, so order by length first (7201 < 10101).
+$studentNoOrder = "s.student_no IS NULL, LENGTH(s.student_no) $dir, s.student_no $dir";
+// Stored columns sort in SQL (MySQL collation handles Thai names); computed attendance columns are
+// sorted in PHP below, on top of the default student ID order.
+$orderBy = match ($sort) {
+    'full_name' => "s.full_name $dir, " . $studentNoOrder,
+    'batch' => "b.batch_no $dir, " . $studentNoOrder,
+    'level' => "cl.sort_order $dir, " . $studentNoOrder,
+    'student_no' => $studentNoOrder,
+    default => 's.student_no IS NULL, LENGTH(s.student_no), s.student_no',
+};
+
 $students = $mysqli->query(
     "SELECT s.id, s.student_no, s.full_name, cl.name AS level_name, b.batch_no, b.name AS batch_name
      FROM students s
      JOIN class_levels cl ON cl.id = s.current_class_level_id
      JOIN batches b ON b.id = s.batch_id
      WHERE s.status = 'approved'
-     ORDER BY b.batch_no DESC, cl.sort_order, s.full_name"
+     ORDER BY $orderBy"
 )->fetch_all(MYSQLI_ASSOC);
 
 function studentClassInstanceId(mysqli $mysqli, int $studentId): ?int
@@ -68,6 +92,32 @@ if ($selectedStudentId === 0) {
                 : null,
         ];
     }
+
+    if ($sort === 'completed' || $sort === 'percent') {
+        $metric = $sort === 'completed' ? 'completed_count' : 'percent';
+        // usort is stable, so ties keep the student ID order from the query.
+        usort($allReports, function (array $a, array $b) use ($metric, $dir): int {
+            // Students with no class schedule have no summary; keep them last either way.
+            if ($a['summary'] === null || $b['summary'] === null) {
+                return ($a['summary'] === null) <=> ($b['summary'] === null);
+            }
+            $cmp = $a['summary'][$metric] <=> $b['summary'][$metric];
+
+            return $dir === 'desc' ? -$cmp : $cmp;
+        });
+    }
+}
+
+function sortHeader(string $key, string $label, string $sort, string $dir): string
+{
+    $isActive = $key === $sort;
+    $nextDir = $isActive && $dir === 'asc' ? 'desc' : 'asc';
+    $indicator = $isActive
+        ? '<span class="sort-indicator">' . ($dir === 'asc' ? '▲' : '▼') . '</span>'
+        : '<span class="sort-indicator inactive">↕</span>';
+
+    return '<a class="sort-link" href="reports.php?sort=' . urlencode($key) . '&amp;dir=' . $nextDir . '">'
+        . htmlspecialchars($label) . $indicator . '</a>';
 }
 
 if ($exportCsv) {
@@ -119,7 +169,8 @@ if ($exportCsv) {
     exit;
 }
 
-$exportHref = 'reports.php?export=csv' . ($selectedStudentId > 0 ? '&student_id=' . $selectedStudentId : '');
+$exportHref = 'reports.php?export=csv&sort=' . urlencode($sort) . '&dir=' . $dir
+    . ($selectedStudentId > 0 ? '&student_id=' . $selectedStudentId : '');
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -136,7 +187,7 @@ $exportHref = 'reports.php?export=csv' . ($selectedStudentId > 0 ? '&student_id=
     <h1>รายงานการเข้าเรียน</h1>
     <nav>
         <a href="dashboard.php">กลับหน้าแผงควบคุม</a>
-        <a href="logout.php">ออกจากระบบ</a>
+        <a class="nav-logout" href="logout.php">ออกจากระบบ</a>
     </nav>
 
     <form action="reports.php" method="get">
@@ -183,7 +234,11 @@ $exportHref = 'reports.php?export=csv' . ($selectedStudentId > 0 ? '&student_id=
     <?php else: ?>
         <div class="table-wrap"><table>
             <thead>
-                <tr><th>รหัสนักศึกษา</th><th>ชื่อ-นามสกุล</th><th>รุ่น</th><th>ระดับชั้น</th><th>เข้าเรียน</th><th>%</th></tr>
+                <tr>
+                    <?php foreach ($sortColumns as $key => $label): ?>
+                        <th><?= sortHeader($key, $label, $sort, $dir) ?></th>
+                    <?php endforeach; ?>
+                </tr>
             </thead>
             <tbody>
                 <?php foreach ($allReports as $row): $s = $row['student']; $summary = $row['summary']; ?>

@@ -161,7 +161,11 @@ CREATE TABLE backup_runs (
 `index.php` is a landing page — the form is not shown until the visitor clicks "ลงทะเบียน"
 (`?register=1`), so a first-time visit doesn't drop straight into a form. Fields: prefix
 (dropdown incl. "อื่นๆ (ระบุ)" free-text), name-surname, age, address, phone, line ID,
-reference person (optional). Always targets whichever batch currently has
+reference person. **Required** (marked `*`, enforced client- and server-side): prefix (plus the
+free-text prefix when "อื่นๆ"), name-surname, age (integer 1-120), address, phone (digits/spaces/
+`-`/`+`, 9-15 digits). Line ID and reference person are optional. On a validation error
+`register.php` stashes the entered values in `$_SESSION['register_old']` and `index.php` refills
+the form once, with a message naming the missing fields. Always targets whichever batch currently has
 `registration_open = TRUE` at level `จูฬตรี`. Inserted as `status = 'pending'`. Rate-limited.
 Text fields are whitespace-normalized before storage (trimmed, internal runs collapsed to one
 space; see `includes/input.php`), and the same normalization is applied to the name typed at

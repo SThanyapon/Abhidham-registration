@@ -115,4 +115,8 @@ sessions. Students enroll into a batch as `pending`, get approved (which assigns
 Access to each is granted per-admin-user independently — a logged-in admin may not have all five.
 `admin/reports.php` (feature 3) reuses `includes/attendance.php`'s `getAttendanceSummary()` to show
 per-session attendance for one selected student or a summary table for every approved student, with
-a CSV export (`?export=csv`, carries the current `student_id` selection) for either view.
+a CSV export (`?export=csv`, carries the current `student_id` selection) for either view. The
+summary table sorts by clickable column headers (`?sort=student_no|full_name|batch|level|completed|percent`
++ `&dir=asc|desc`, whitelisted; default `student_no` ascending, ordered by length then value so
+IDs sort numerically). Stored columns sort in SQL; the computed attendance columns sort in PHP, and
+the CSV export follows the same order.

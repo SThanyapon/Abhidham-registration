@@ -163,7 +163,7 @@ $dayLabels = [
     <h1>การจัดการชั้นเรียนและตารางเรียน</h1>
     <nav>
         <a href="dashboard.php">กลับหน้าแผงควบคุม</a>
-        <a href="logout.php">ออกจากระบบ</a>
+        <a class="nav-logout" href="logout.php">ออกจากระบบ</a>
     </nav>
 
     <?php if ($notice): ?><p class="success"><?= htmlspecialchars($notice) ?></p><?php endif; ?>
