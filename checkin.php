@@ -6,10 +6,16 @@ require_once __DIR__ . '/includes/csrf.php';
 require_once __DIR__ . '/includes/input.php';
 require_once __DIR__ . '/includes/attendance.php';
 require_once __DIR__ . '/includes/date_helpers.php';
+require_once __DIR__ . '/includes/student_helpers.php';
 
 $mysqli = getDbConnection();
 $error = null;
+$notice = null;
+$success = null;
+$student = null;
 $attendance = null;
+$fullName = '';
+$studentNo = '';
 $selectedClassInstanceId = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -26,54 +32,83 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $studentNo = cleanCode($_POST['student_no'] ?? '');
         $classInstanceId = (int) ($_POST['class_instance_id'] ?? 0);
         $sessionId = (int) ($_POST['session_id'] ?? 0);
+        $selectedClassInstanceId = $classInstanceId > 0 ? $classInstanceId : null;
 
-        $stmt = $mysqli->prepare(
-            'SELECT s.id, ci.id AS class_instance_id
-             FROM students s
-             JOIN class_instances ci ON ci.batch_id = s.batch_id AND ci.class_level_id = s.current_class_level_id
-             WHERE s.student_no = ? AND s.full_name = ? AND s.status = "approved" AND ci.id = ?'
-        );
-        $stmt->bind_param('ssi', $studentNo, $fullName, $classInstanceId);
-        $stmt->execute();
-        $student = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
+        $missing = [];
+        if ($fullName === '') {
+            $missing[] = 'ชื่อ-นามสกุล';
+        }
+        if ($studentNo === '') {
+            $missing[] = 'รหัสนักศึกษา';
+        }
 
-        if (!$student) {
-            $error = 'ชื่อ รหัสนักศึกษา หรือชั้นเรียนไม่ตรงกับข้อมูลในระบบ';
+        if ($missing !== []) {
+            $error = 'กรุณากรอก: ' . implode(', ', $missing);
         } else {
-            $sessionStmt = $mysqli->prepare(
-                'SELECT id FROM sessions WHERE id = ? AND class_instance_id = ? AND is_cancelled = 0'
+            $stmt = $mysqli->prepare(
+                'SELECT id, prefix, prefix_other, full_name, student_no
+                 FROM students
+                 WHERE student_no = ? AND full_name = ? AND status = "approved"'
             );
-            $sessionStmt->bind_param('ii', $sessionId, $classInstanceId);
-            $sessionStmt->execute();
-            $session = $sessionStmt->get_result()->fetch_assoc();
-            $sessionStmt->close();
+            $stmt->bind_param('ss', $studentNo, $fullName);
+            $stmt->execute();
+            $student = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
 
-            if (!$session) {
-                $error = 'ครั้งที่เรียนที่เลือกไม่ถูกต้อง';
+            if (!$student) {
+                $error = 'ชื่อ-นามสกุล หรือรหัสนักศึกษาไม่ตรงกับข้อมูลในระบบ';
             } else {
-                $dupStmt = $mysqli->prepare(
-                    'SELECT id FROM checkins WHERE student_id = ? AND session_id = ?'
-                );
-                $dupStmt->bind_param('ii', $student['id'], $sessionId);
-                $dupStmt->execute();
-                $already = $dupStmt->get_result()->fetch_assoc();
-                $dupStmt->close();
+                $currentClassId = studentClassInstanceId($mysqli, (int) $student['id']);
 
-                if ($already) {
-                    $error = 'คุณได้ลงชื่อเข้าเรียนครั้งนี้แล้ว';
+                if ($currentClassId === null) {
+                    $notice = 'ยังไม่มีตารางเรียนสำหรับชั้นเรียนปัจจุบันของท่าน';
+                } elseif ($classInstanceId > 0 && $sessionId > 0) {
+                    // Check-in mode: both class and session chosen.
+                    if ($classInstanceId !== $currentClassId) {
+                        $error = 'ชั้นเรียนที่เลือกไม่ตรงกับชั้นเรียนปัจจุบันของท่าน';
+                    } else {
+                        $sessionStmt = $mysqli->prepare(
+                            'SELECT id FROM sessions WHERE id = ? AND class_instance_id = ? AND is_cancelled = 0'
+                        );
+                        $sessionStmt->bind_param('ii', $sessionId, $classInstanceId);
+                        $sessionStmt->execute();
+                        $session = $sessionStmt->get_result()->fetch_assoc();
+                        $sessionStmt->close();
+
+                        if (!$session) {
+                            $error = 'ครั้งที่เรียนที่เลือกไม่ถูกต้อง';
+                        } else {
+                            $dupStmt = $mysqli->prepare(
+                                'SELECT id FROM checkins WHERE student_id = ? AND session_id = ?'
+                            );
+                            $dupStmt->bind_param('ii', $student['id'], $sessionId);
+                            $dupStmt->execute();
+                            $already = $dupStmt->get_result()->fetch_assoc();
+                            $dupStmt->close();
+
+                            if ($already) {
+                                $error = 'คุณได้ลงชื่อเข้าเรียนครั้งนี้แล้ว';
+                            } else {
+                                $insert = $mysqli->prepare(
+                                    'INSERT INTO checkins (student_id, session_id) VALUES (?, ?)'
+                                );
+                                $insert->bind_param('ii', $student['id'], $sessionId);
+                                $insert->execute();
+                                $insert->close();
+                                $success = 'ลงชื่อเข้าเรียนเรียบร้อยแล้ว';
+                            }
+                        }
+                    }
                 } else {
-                    $insert = $mysqli->prepare(
-                        'INSERT INTO checkins (student_id, session_id) VALUES (?, ?)'
-                    );
-                    $insert->bind_param('ii', $student['id'], $sessionId);
-                    $insert->execute();
-                    $insert->close();
+                    // View-only mode: class or session not chosen, so nothing is written.
+                    $notice = 'แสดงความก้าวหน้าการเข้าเรียน (ยังไม่ได้บันทึกการลงชื่อเข้าเรียน — '
+                        . 'หากต้องการลงชื่อ กรุณาเลือกชั้นเรียนและครั้งที่)';
+                }
+
+                if ($currentClassId !== null) {
+                    $attendance = getAttendanceSummary($mysqli, $currentClassId, (int) $student['id']);
                 }
             }
-
-            $selectedClassInstanceId = $classInstanceId;
-            $attendance = getAttendanceSummary($mysqli, $classInstanceId, $student['id']);
         }
     }
 }
@@ -113,14 +148,14 @@ foreach ($classes as $class) {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap">
-    <title>ลงชื่อเข้าเรียน - ระบบลงทะเบียนอภิธรรม</title>
+    <title>ลงชื่อ/ตรวจสอบการเข้าเรียน - ระบบลงทะเบียนอภิธรรม</title>
     <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
-    <h1>ลงชื่อเข้าเรียน</h1>
+    <h1>ลงชื่อ/ตรวจสอบการเข้าเรียน</h1>
     <nav>
         <a href="index.php">ลงทะเบียน</a>
-        <a href="checkin.php">ลงชื่อเข้าเรียน</a>
+        <a href="checkin.php">ลงชื่อ/ตรวจสอบการเข้าเรียน</a>
         <a href="lookup.php">ค้นหารหัสนักศึกษา</a>
         <a class="nav-admin" href="admin/login.php">ผู้ดูแลระบบ</a>
     </nav>
@@ -128,18 +163,27 @@ foreach ($classes as $class) {
     <?php if ($error): ?>
         <p class="error"><?= htmlspecialchars($error) ?></p>
     <?php endif; ?>
+    <?php if ($success): ?>
+        <p class="success"><?= htmlspecialchars($success) ?></p>
+    <?php endif; ?>
+    <?php if ($notice): ?>
+        <p class="notice"><?= htmlspecialchars($notice) ?></p>
+    <?php endif; ?>
 
     <form action="checkin.php" method="post">
         <?= csrfField() ?>
 
-        <label for="full_name">ชื่อ-นามสกุล (ภาษาไทย)</label>
-        <input type="text" id="full_name" name="full_name" required>
+        <p class="form-note"><span class="required-mark">*</span> จำเป็นต้องกรอก ·
+            หากไม่เลือกชั้นเรียนและครั้งที่ ระบบจะแสดงเฉพาะความก้าวหน้าการเข้าเรียน</p>
 
-        <label for="student_no">รหัสนักศึกษา</label>
-        <input type="text" id="student_no" name="student_no" required>
+        <label for="full_name">ชื่อ-นามสกุล (ภาษาไทย)<span class="required-mark">*</span></label>
+        <input type="text" id="full_name" name="full_name" required value="<?= htmlspecialchars($fullName) ?>">
+
+        <label for="student_no">รหัสนักศึกษา<span class="required-mark">*</span></label>
+        <input type="text" id="student_no" name="student_no" required value="<?= htmlspecialchars($studentNo) ?>">
 
         <label for="class_instance_id">ชั้นเรียน</label>
-        <select id="class_instance_id" name="class_instance_id" required onchange="updateSessions()">
+        <select id="class_instance_id" name="class_instance_id" onchange="updateSessions()">
             <option value="">-- เลือกชั้นเรียน --</option>
             <?php foreach ($classes as $class): ?>
                 <option value="<?= $class['id'] ?>" <?= $selectedClassInstanceId === (int) $class['id'] ? 'selected' : '' ?>>
@@ -149,15 +193,20 @@ foreach ($classes as $class) {
         </select>
 
         <label for="session_id">ครั้งที่</label>
-        <select id="session_id" name="session_id" required>
-            <option value="">-- Select class first --</option>
+        <select id="session_id" name="session_id">
+            <option value="">-- เลือกชั้นเรียนก่อน --</option>
         </select>
 
-        <button type="submit">ลงชื่อเข้าเรียน</button>
+        <button type="submit">ลงชื่อ/ตรวจสอบการเข้าเรียน</button>
     </form>
 
-    <?php if ($attendance): ?>
+    <?php if ($student && $attendance): ?>
         <div class="card">
+            <p>
+                คำนำหน้า: <strong><?= htmlspecialchars(studentPrefix($student)) ?></strong><br>
+                ชื่อ-นามสกุล: <strong><?= htmlspecialchars($student['full_name']) ?></strong><br>
+                รหัสนักศึกษา: <strong><?= htmlspecialchars($student['student_no']) ?></strong>
+            </p>
             <p class="progress">
                 ความก้าวหน้า: <?= $attendance['completed_count'] ?> / <?= $attendance['conducted_count'] ?>
                 (<?= $attendance['percent'] ?>%)
@@ -182,7 +231,9 @@ foreach ($classes as $class) {
             const sessionSelect = document.getElementById('session_id');
             const sessions = SESSIONS_BY_CLASS[classSelect.value] || [];
 
-            sessionSelect.innerHTML = '<option value="">-- เลือกครั้งที่ --</option>';
+            sessionSelect.innerHTML = classSelect.value
+                ? '<option value="">-- เลือกครั้งที่ --</option>'
+                : '<option value="">-- เลือกชั้นเรียนก่อน --</option>';
             sessions.forEach(function (session) {
                 const option = document.createElement('option');
                 option.value = session.id;

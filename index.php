@@ -30,7 +30,7 @@ function oldValue(array $old, string $key): string
     <h1>ลงทะเบียนเรียนพระอภิธรรม</h1>
     <nav>
         <a href="index.php?register=1">ลงทะเบียน</a>
-        <a href="checkin.php">ลงชื่อเข้าเรียน</a>
+        <a href="checkin.php">ลงชื่อ/ตรวจสอบการเข้าเรียน</a>
         <a href="lookup.php">ค้นหารหัสนักศึกษา</a>
         <a class="nav-admin" href="admin/login.php">ผู้ดูแลระบบ</a>
     </nav>

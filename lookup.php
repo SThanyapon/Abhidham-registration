@@ -4,6 +4,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/rate_limit.php';
 require_once __DIR__ . '/includes/csrf.php';
 require_once __DIR__ . '/includes/input.php';
+require_once __DIR__ . '/includes/student_helpers.php';
 
 $error = null;
 $result = null;
@@ -26,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // A name may have several registrations (e.g. rejected, then re-registered); report the most
         // relevant one: approved, then pending, then rejected, newest first.
         $stmt = $mysqli->prepare(
-            "SELECT student_no, status FROM students WHERE full_name = ?
+            "SELECT student_no, status, prefix, prefix_other FROM students WHERE full_name = ?
              ORDER BY FIELD(status, 'approved', 'pending', 'rejected'), created_at DESC
              LIMIT 1"
         );
@@ -52,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <h1>ค้นหารหัสนักศึกษา</h1>
     <nav>
         <a href="index.php">ลงทะเบียน</a>
-        <a href="checkin.php">ลงชื่อเข้าเรียน</a>
+        <a href="checkin.php">ลงชื่อ/ตรวจสอบการเข้าเรียน</a>
         <a href="lookup.php">ค้นหารหัสนักศึกษา</a>
         <a class="nav-admin" href="admin/login.php">ผู้ดูแลระบบ</a>
     </nav>
@@ -70,7 +71,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <?php if ($searched): ?>
         <?php
-        $nameLine = 'ชื่อ-นามสกุล: <strong>' . htmlspecialchars($fullName) . '</strong><br>';
+        // Prefix comes from the matched registration; with no match only the typed name is known.
+        $displayName = $result !== null ? studentPrefix($result) . ' ' . $fullName : $fullName;
+        $nameLine = 'ชื่อ-นามสกุล: <strong>' . htmlspecialchars($displayName) . '</strong><br>';
         ?>
         <?php if ($result === null): ?>
             <p class="error"><?= $nameLine ?>ไม่พบการลงทะเบียนของท่าน กรุณาทำการลงทะเบียนก่อนค่ะ</p>

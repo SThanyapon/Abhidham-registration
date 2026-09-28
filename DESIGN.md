@@ -172,13 +172,20 @@ space; see `includes/input.php`), and the same normalization is applied to the n
 check-in/lookup, so extra spaces never cause a name mismatch.
 
 ### 4.2 Check-in (`checkin.php`)
-Student enters name-surname + student ID + class, then **selects the ครั้งที่ (session)
-themselves** from a dropdown of that class's sessions, shown in short Thai Buddhist Era date
-format (e.g. `17 ก.ย. 69`; no auto-detection by date). System:
-1. Verifies name/ID/class match an approved student.
-2. If already checked in for that session → show error.
-3. Otherwise insert into `checkins`, then render a grid of all sessions so far: green =
-   checked in, grey = missing.
+Menu caption "ลงชื่อ/ตรวจสอบการเข้าเรียน" — the page both records attendance and shows progress.
+Student enters name-surname + student ID (**required**, marked `*`), and optionally a class and
+then **selects the ครั้งที่ (session) themselves** from a dropdown of that class's sessions, shown
+in short Thai Buddhist Era date format (e.g. `17 ก.ย. 69`; no auto-detection by date). System:
+1. Verifies name + ID match an approved student, and finds their current class instance
+   (`studentClassInstanceId()`, batch + current level).
+2. **Check-in mode** (class and session both chosen): the class must be the student's current
+   class; if already checked in for that session → error; otherwise insert into `checkins` and
+   confirm "ลงชื่อเข้าเรียนเรียบร้อยแล้ว".
+3. **View-only mode** (class or session missing): nothing is written; a notice explains that only
+   progress is shown.
+4. In both modes, render the student's คำนำหน้า / ชื่อ-นามสกุล / รหัสนักศึกษา, then a grid of all
+   sessions so far for their current class: green = checked in, grey = missing. Name, ID and
+   class are refilled after submitting.
 4. `% complete = checkins / (count of sessions whose date <= the most recent past session's
    date)` — i.e. only sessions already conducted count toward the denominator, not future
    scheduled ones.
@@ -195,7 +202,8 @@ rejected, newest first):
 - no match → "ไม่พบการลงทะเบียนของท่าน กรุณาทำการลงทะเบียนก่อนค่ะ".
 
 Every result also echoes the searched name (after whitespace normalization) as
-"ชื่อ-นามสกุล: …", so the user can spot a typo.
+"ชื่อ-นามสกุล: …", prefixed with the registration's คำนำหน้า when one was found, so the user can
+spot a typo.
 
 ## 5. Admin/backend features
 

@@ -4,6 +4,7 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/input.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/student_id.php';
+require_once __DIR__ . '/../includes/student_helpers.php';
 
 $adminId = requireAdminLogin();
 requireFeature($adminId, 2);
@@ -99,7 +100,7 @@ $pending = $mysqli->query(
     <?php foreach ($pending as $student): ?>
         <div class="card">
             <p>
-                <strong><?= htmlspecialchars(($student['prefix'] === 'อื่นๆ' ? $student['prefix_other'] : $student['prefix']) . ' ' . $student['full_name']) ?></strong>
+                <strong><?= htmlspecialchars(studentPrefix($student) . ' ' . $student['full_name']) ?></strong>
                 — <?= htmlspecialchars($student['batch_name'] ?: 'รุ่น ' . $student['batch_no']) ?>
             </p>
             <p>

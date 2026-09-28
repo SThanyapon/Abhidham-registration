@@ -4,6 +4,7 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/attendance.php';
 require_once __DIR__ . '/../includes/date_helpers.php';
+require_once __DIR__ . '/../includes/student_helpers.php';
 
 $adminId = requireAdminLogin();
 requireFeature($adminId, 3);
@@ -13,6 +14,7 @@ $mysqli = getDbConnection();
 // Sortable columns for the all-students table: key => header label. Default: student ID ascending.
 $sortColumns = [
     'student_no' => 'รหัสนักศึกษา',
+    'prefix' => 'คำนำหน้า',
     'full_name' => 'ชื่อ-นามสกุล',
     'batch' => 'รุ่น',
     'level' => 'ระดับชั้น',
@@ -27,6 +29,8 @@ $studentNoOrder = "s.student_no IS NULL, LENGTH(s.student_no) $dir, s.student_no
 // Stored columns sort in SQL (MySQL collation handles Thai names); computed attendance columns are
 // sorted in PHP below, on top of the default student ID order.
 $orderBy = match ($sort) {
+    // Sort by the displayed prefix (the free-text one when "อื่นๆ"), matching studentPrefix().
+    'prefix' => "CASE WHEN s.prefix = 'อื่นๆ' THEN s.prefix_other ELSE s.prefix END $dir, " . $studentNoOrder,
     'full_name' => "s.full_name $dir, " . $studentNoOrder,
     'batch' => "b.batch_no $dir, " . $studentNoOrder,
     'level' => "cl.sort_order $dir, " . $studentNoOrder,
@@ -35,29 +39,13 @@ $orderBy = match ($sort) {
 };
 
 $students = $mysqli->query(
-    "SELECT s.id, s.student_no, s.full_name, cl.name AS level_name, b.batch_no, b.name AS batch_name
+    "SELECT s.id, s.student_no, s.prefix, s.prefix_other, s.full_name, cl.name AS level_name, b.batch_no, b.name AS batch_name
      FROM students s
      JOIN class_levels cl ON cl.id = s.current_class_level_id
      JOIN batches b ON b.id = s.batch_id
      WHERE s.status = 'approved'
      ORDER BY $orderBy"
 )->fetch_all(MYSQLI_ASSOC);
-
-function studentClassInstanceId(mysqli $mysqli, int $studentId): ?int
-{
-    $stmt = $mysqli->prepare(
-        'SELECT ci.id
-         FROM students s
-         JOIN class_instances ci ON ci.batch_id = s.batch_id AND ci.class_level_id = s.current_class_level_id
-         WHERE s.id = ?'
-    );
-    $stmt->bind_param('i', $studentId);
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-
-    return $row ? (int) $row['id'] : null;
-}
 
 $selectedStudentId = (int) ($_GET['student_id'] ?? 0);
 $exportCsv = ($_GET['export'] ?? '') === 'csv';
@@ -132,9 +120,10 @@ if ($exportCsv) {
     fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel renders Thai text correctly
 
     if ($selectedStudent) {
-        fputcsv($out, ['รหัสนักศึกษา', 'ชื่อ-นามสกุล', 'รุ่น', 'ระดับชั้น']);
+        fputcsv($out, ['รหัสนักศึกษา', 'คำนำหน้า', 'ชื่อ-นามสกุล', 'รุ่น', 'ระดับชั้น']);
         fputcsv($out, [
             $selectedStudent['student_no'] ?? '-',
+            studentPrefix($selectedStudent),
             $selectedStudent['full_name'],
             $selectedStudent['batch_name'] ?: 'รุ่น ' . $selectedStudent['batch_no'],
             $selectedStudent['level_name'],
@@ -149,12 +138,13 @@ if ($exportCsv) {
             ]);
         }
     } else {
-        fputcsv($out, ['รหัสนักศึกษา', 'ชื่อ-นามสกุล', 'รุ่น', 'ระดับชั้น', 'เข้าเรียน (ครั้ง)', 'จัดสอนแล้ว (ครั้ง)', 'ร้อยละ']);
+        fputcsv($out, ['รหัสนักศึกษา', 'คำนำหน้า', 'ชื่อ-นามสกุล', 'รุ่น', 'ระดับชั้น', 'เข้าเรียน (ครั้ง)', 'จัดสอนแล้ว (ครั้ง)', 'ร้อยละ']);
         foreach ($allReports as $row) {
             $s = $row['student'];
             $summary = $row['summary'];
             fputcsv($out, [
                 $s['student_no'] ?? '-',
+                studentPrefix($s),
                 $s['full_name'],
                 $s['batch_name'] ?: 'รุ่น ' . $s['batch_no'],
                 $s['level_name'],
@@ -196,7 +186,7 @@ $exportHref = 'reports.php?export=csv&sort=' . urlencode($sort) . '&dir=' . $dir
             <option value="0" <?= $selectedStudentId === 0 ? 'selected' : '' ?>>-- นักศึกษาทั้งหมด --</option>
             <?php foreach ($students as $student): ?>
                 <option value="<?= $student['id'] ?>" <?= $selectedStudentId === (int) $student['id'] ? 'selected' : '' ?>>
-                    <?= htmlspecialchars(($student['student_no'] ?? '-') . ' - ' . $student['full_name']) ?>
+                    <?= htmlspecialchars(($student['student_no'] ?? '-') . ' - ' . studentPrefix($student) . ' ' . $student['full_name']) ?>
                 </option>
             <?php endforeach; ?>
         </select>
@@ -213,7 +203,7 @@ $exportHref = 'reports.php?export=csv&sort=' . urlencode($sort) . '&dir=' . $dir
         <?php else: ?>
             <div class="card">
                 <p>
-                    <strong><?= htmlspecialchars(($selectedStudent['student_no'] ?? '-') . ' ' . $selectedStudent['full_name']) ?></strong>
+                    <strong><?= htmlspecialchars(($selectedStudent['student_no'] ?? '-') . ' ' . studentPrefix($selectedStudent) . ' ' . $selectedStudent['full_name']) ?></strong>
                     — <?= htmlspecialchars($selectedStudent['batch_name'] ?: 'รุ่น ' . $selectedStudent['batch_no']) ?>
                     / <?= htmlspecialchars($selectedStudent['level_name']) ?>
                 </p>
@@ -244,6 +234,7 @@ $exportHref = 'reports.php?export=csv&sort=' . urlencode($sort) . '&dir=' . $dir
                 <?php foreach ($allReports as $row): $s = $row['student']; $summary = $row['summary']; ?>
                     <tr>
                         <td><?= htmlspecialchars($s['student_no'] ?? '-') ?></td>
+                        <td><?= htmlspecialchars(studentPrefix($s)) ?></td>
                         <td><?= htmlspecialchars($s['full_name']) ?></td>
                         <td><?= htmlspecialchars($s['batch_name'] ?: 'รุ่น ' . $s['batch_no']) ?></td>
                         <td><?= htmlspecialchars($s['level_name']) ?></td>

@@ -86,6 +86,10 @@ block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
   under `config.local.php['backup']['directory']` (no dependency on the `mysqldump` binary), logs to
   `backup_runs`, emails a notification (without the file attached, since `mailer.php` has no attachment
   support).
+- `student_helpers.php` — `studentPrefix()` (display prefix: `prefix_other` when `prefix` is
+  `อื่นๆ`) and `studentClassInstanceId()` (class instance for a student's batch + current level;
+  `null` if not created yet). Used by `checkin.php`, `lookup.php`, `admin/approvals.php`,
+  `admin/reports.php`.
 - `date_helpers.php` — `formatDateBEShort()`: renders an ISO date as a short Thai Buddhist-Era date
   (e.g. `17 ก.ย. 69` — day, abbreviated Thai month, 2-digit BE year). Used wherever a session/class date
   is displayed to students or admins (`checkin.php`, `admin/classes.php`); storage stays Gregorian ISO
@@ -116,7 +120,7 @@ Access to each is granted per-admin-user independently — a logged-in admin may
 `admin/reports.php` (feature 3) reuses `includes/attendance.php`'s `getAttendanceSummary()` to show
 per-session attendance for one selected student or a summary table for every approved student, with
 a CSV export (`?export=csv`, carries the current `student_id` selection) for either view. The
-summary table sorts by clickable column headers (`?sort=student_no|full_name|batch|level|completed|percent`
+summary table sorts by clickable column headers (`?sort=student_no|prefix|full_name|batch|level|completed|percent`
 + `&dir=asc|desc`, whitelisted; default `student_no` ascending, ordered by length then value so
 IDs sort numerically). Stored columns sort in SQL; the computed attendance columns sort in PHP, and
 the CSV export follows the same order.
