@@ -34,6 +34,9 @@ php cron/backup.php
 
 # Purge expired OTP codes (intended for a scheduled task/cron; runs hourly in production)
 php cron/clear_expired_otp.php
+
+# One-off: apply includes/input.php whitespace rules to rows stored before they existed (idempotent)
+php scripts/normalize_whitespace.php
 ```
 
 First-time setup requires copying `config.local.php.example` to `config.local.php` (gitignored) and
@@ -87,6 +90,12 @@ block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
   (e.g. `17 ก.ย. 69` — day, abbreviated Thai month, 2-digit BE year). Used wherever a session/class date
   is displayed to students or admins (`checkin.php`, `admin/classes.php`); storage stays Gregorian ISO
   (`DATE` columns), conversion only happens at display time.
+- `input.php` — whitespace normalization for user input, used instead of bare `trim()` on every
+  free-text `$_POST` field: `cleanText()` (trim + collapse internal whitespace, incl. NBSP and
+  zero-width chars, to one space), `cleanMultilineText()` (same per line, for the address textarea),
+  `cleanCode()` (strip all whitespace, for student IDs and OTP codes). This matters for correctness,
+  not just tidiness: check-in and lookup match `full_name` by exact equality. Passwords are never
+  cleaned.
 
 **`cron/backup.php`** is the CLI entry point for scheduled backups (Windows Task Scheduler or cron),
 calling `includes/backup.php`'s `runBackup('scheduled')`.
