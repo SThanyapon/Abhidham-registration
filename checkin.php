@@ -35,11 +35,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $selectedClassInstanceId = $classInstanceId > 0 ? $classInstanceId : null;
 
         $missing = [];
-        if ($fullName === '') {
-            $missing[] = 'ชื่อ-นามสกุล';
-        }
         if ($studentNo === '') {
             $missing[] = 'รหัสนักศึกษา';
+        }
+        if ($fullName === '') {
+            $missing[] = 'ชื่อ-นามสกุล';
         }
 
         if ($missing !== []) {
@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->close();
 
             if (!$student) {
-                $error = 'ชื่อ-นามสกุล หรือรหัสนักศึกษาไม่ตรงกับข้อมูลในระบบ';
+                $error = 'รหัสนักศึกษา หรือชื่อ-นามสกุลไม่ตรงกับข้อมูลในระบบ';
             } else {
                 $currentClassId = studentClassInstanceId($mysqli, (int) $student['id']);
 
@@ -176,11 +176,11 @@ foreach ($classes as $class) {
         <p class="form-note"><span class="required-mark">*</span> จำเป็นต้องกรอก ·
             หากไม่เลือกชั้นเรียนและครั้งที่ ระบบจะแสดงเฉพาะความก้าวหน้าการเข้าเรียน</p>
 
-        <label for="full_name">ชื่อ-นามสกุล (ภาษาไทย)<span class="required-mark">*</span></label>
-        <input type="text" id="full_name" name="full_name" required value="<?= htmlspecialchars($fullName) ?>">
-
         <label for="student_no">รหัสนักศึกษา<span class="required-mark">*</span></label>
         <input type="text" id="student_no" name="student_no" required value="<?= htmlspecialchars($studentNo) ?>">
+
+        <label for="full_name">ชื่อ-นามสกุล (ภาษาไทย)<span class="required-mark">*</span></label>
+        <input type="text" id="full_name" name="full_name" required value="<?= htmlspecialchars($fullName) ?>">
 
         <label for="class_instance_id">ชั้นเรียน</label>
         <select id="class_instance_id" name="class_instance_id" onchange="updateSessions()">
@@ -203,9 +203,9 @@ foreach ($classes as $class) {
     <?php if ($student && $attendance): ?>
         <div class="card">
             <p>
+                รหัสนักศึกษา: <strong><?= htmlspecialchars($student['student_no']) ?></strong><br>
                 คำนำหน้า: <strong><?= htmlspecialchars(studentPrefix($student)) ?></strong><br>
-                ชื่อ-นามสกุล: <strong><?= htmlspecialchars($student['full_name']) ?></strong><br>
-                รหัสนักศึกษา: <strong><?= htmlspecialchars($student['student_no']) ?></strong>
+                ชื่อ-นามสกุล: <strong><?= htmlspecialchars($student['full_name']) ?></strong>
             </p>
             <p class="progress">
                 ความก้าวหน้า: <?= $attendance['completed_count'] ?> / <?= $attendance['conducted_count'] ?>
