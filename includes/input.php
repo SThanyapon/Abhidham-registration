@@ -30,6 +30,16 @@ function cleanMultilineText(string $value): string
 }
 
 /**
+ * Person names: Thai letters/vowels/tone marks/digits (excluding Thai symbols such as ฿ and ๏),
+ * English letters, digits, spaces, and dashes ('-' plus the Unicode hyphens/en dash U+2010-U+2013
+ * that phones and pasted text produce). Rejects '/', '*', '&', '.', etc.
+ */
+function isValidPersonName(string $name): bool
+{
+    return preg_match('/^[\x{0E01}-\x{0E3A}\x{0E40}-\x{0E4E}\x{0E50}-\x{0E59}A-Za-z0-9 \-\x{2010}-\x{2013}]+$/u', $name) === 1;
+}
+
+/**
  * Identifiers where spaces are never valid (student ID, OTP code): removes all whitespace,
  * so a pasted "123 456" becomes "123456".
  */

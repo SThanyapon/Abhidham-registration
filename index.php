@@ -80,7 +80,9 @@ function oldValue(array $old, string $key): string
             </div>
 
             <label for="full_name">ชื่อ-นามสกุล (ภาษาไทย)<span class="required-mark">*</span></label>
-            <input type="text" id="full_name" name="full_name" required value="<?= oldValue($old, 'full_name') ?>">
+            <input type="text" id="full_name" name="full_name" required value="<?= oldValue($old, 'full_name') ?>"
+                   pattern="[ก-ฺเ-๎๐-๙A-Za-z0-9 \-‐-–]+"
+                   title="ใช้ได้เฉพาะอักษรไทย อักษรอังกฤษ ตัวเลข ขีด (-) และช่องว่าง">
 
             <label for="age">อายุ<span class="required-mark">*</span></label>
             <input type="number" id="age" name="age" min="1" max="120" required value="<?= oldValue($old, 'age') ?>">

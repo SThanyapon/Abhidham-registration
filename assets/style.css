@@ -132,6 +132,35 @@ nav a.nav-logout:hover {
     color: var(--danger-dark);
 }
 
+/* Segmented switch between report views */
+.view-toggle {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.view-toggle a {
+    padding: 8px 18px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.view-toggle a:hover {
+    background: var(--primary-soft);
+    color: var(--primary-dark);
+}
+
+.view-toggle a.active {
+    background: var(--primary-dark);
+    border-color: var(--primary-dark);
+    color: #fff;
+}
+
 .required-mark {
     color: var(--danger);
     margin-left: 2px;

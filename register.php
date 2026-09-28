@@ -74,6 +74,10 @@ if ($missing !== []) {
     failRegistration('กรุณากรอกข้อมูลให้ครบถ้วน: ' . implode(', ', $missing), $old);
 }
 
+if (!isValidPersonName($fullName)) {
+    failRegistration('ชื่อ-นามสกุล ใช้ได้เฉพาะอักษรไทย อักษรอังกฤษ ตัวเลข ขีด (-) และช่องว่างเท่านั้น', $old);
+}
+
 if (!ctype_digit($age) || (int) $age < 1 || (int) $age > 120) {
     failRegistration('กรุณากรอกอายุเป็นตัวเลข 1-120', $old);
 }

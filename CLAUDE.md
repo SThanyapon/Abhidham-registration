@@ -97,7 +97,8 @@ block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
 - `input.php` — whitespace normalization for user input, used instead of bare `trim()` on every
   free-text `$_POST` field: `cleanText()` (trim + collapse internal whitespace, incl. NBSP and
   zero-width chars, to one space), `cleanMultilineText()` (same per line, for the address textarea),
-  `cleanCode()` (strip all whitespace, for student IDs and OTP codes). This matters for correctness,
+  `cleanCode()` (strip all whitespace, for student IDs and OTP codes), and `isValidPersonName()`
+  (registration name whitelist: Thai/English letters, digits, spaces, dashes). This matters for correctness,
   not just tidiness: check-in and lookup match `full_name` by exact equality. Passwords are never
   cleaned.
 
@@ -123,4 +124,7 @@ a CSV export (`?export=csv`, carries the current `student_id` selection) for eit
 summary table sorts by clickable column headers (`?sort=student_no|prefix|full_name|batch|level|completed|percent`
 + `&dir=asc|desc`, whitelisted; default `student_no` ascending, ordered by length then value so
 IDs sort numerically). Stored columns sort in SQL; the computed attendance columns sort in PHP, and
-the CSV export follows the same order.
+the CSV export follows the same order. A `?view=approved|rejected` toggle (default `approved`)
+switches to a list of rejected applicants (contact details + application date, sortable by
+prefix/name/batch/date, newest first by default, with its own CSV export); rejected rows have no
+`student_no` or level, so that view skips the `class_levels` join.

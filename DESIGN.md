@@ -163,7 +163,9 @@ CREATE TABLE backup_runs (
 (dropdown incl. "อื่นๆ (ระบุ)" free-text), name-surname, age, address, phone, line ID,
 reference person. **Required** (marked `*`, enforced client- and server-side): prefix (plus the
 free-text prefix when "อื่นๆ"), name-surname, age (integer 1-120), address, phone (digits/spaces/
-`-`/`+`, 9-15 digits). Line ID and reference person are optional. On a validation error
+`-`/`+`, 9-15 digits). Name-surname may contain only Thai letters/vowels/tone marks/digits, English
+letters, digits, spaces, and dashes (`isValidPersonName()` in `includes/input.php`); symbols such
+as `/`, `*`, `&`, `.`, `฿` are rejected. Line ID and reference person are optional. On a validation error
 `register.php` stashes the entered values in `$_SESSION['register_old']` and `index.php` refills
 the form once, with a message naming the missing fields. Always targets whichever batch currently has
 `registration_open = TRUE` at level `จูฬตรี`. Inserted as `status = 'pending'`. Rate-limited.
