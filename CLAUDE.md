@@ -58,7 +58,9 @@ block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
   (lazy mysqli singleton, `MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT`, utf8mb4). Every other include
   depends on this one. All queries use prepared statements (`bind_param`).
 - `auth.php` — admin session management (`loginAdmin`/`logoutAdmin`/`currentAdminId`) and **per-feature**
-  authorization: `requireAdminLogin()` gates on being logged in, `requireFeature($adminId, $n)` gates on
+  authorization: `requireAdminLogin()` gates on being logged in and on the account still existing with
+  `is_active = 1` (so disabling/deleting an admin in `admin/admins.php` ends their session on the next
+  request), `requireFeature($adminId, $n)` gates on
   the numbered feature (0-4, 6, 7, 9) via the `admin_permissions` table. Every admin page calls both.
 - `csrf.php` — `csrfToken()`/`csrfField()`/`verifyCsrf()`. Every POST handler calls `verifyCsrf()`
   first; every form includes `<?= csrfField() ?>`.

@@ -222,7 +222,18 @@ number before allowing access.
 ### Feature 0 — Manage admin staff
 `admin/admins.php`, the web equivalent of `scripts/create_admin.php`. It creates an admin user
 (username, email for OTP, password ≥ 8 chars, plus the features to grant) and lists the
-existing admins with their features. Editing or deactivating admins is not supported.
+existing admins with their features. Each listed admin has a จัดการ link (`?edit=<id>`) that opens:
+- **Reset password**: set a new password (≥ 8 chars). Any pending OTP codes for that account are
+  deleted.
+- **Enable/disable**: toggles `admin_users.is_active`. Login already refuses disabled accounts, and
+  `requireAdminLogin()` also logs out a disabled or deleted account on its next request.
+- **Delete**: removes the account with its `otp_codes` and `admin_permissions` rows. It's refused
+  when the admin has `promotions` history (`promoted_by` is a NOT NULL audit trail), and the admin is
+  told to disable the account instead.
+
+An admin can't disable or delete their own account, but can reset their own password. The acting
+admin is always active and holds feature 0, so at least one admin who can manage accounts always
+remains. Changing an existing admin's feature permissions isn't supported.
 
 ### Feature 1 — Class management
 - Open/close registration per batch (`batches.registration_open`).

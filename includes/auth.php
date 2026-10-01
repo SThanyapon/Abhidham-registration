@@ -33,6 +33,20 @@ function requireAdminLogin(): int
         exit;
     }
 
+    // An account disabled or deleted (admin/admins.php) loses access on its next request, not just at
+    // its next login.
+    $stmt = getDbConnection()->prepare('SELECT is_active FROM admin_users WHERE id = ?');
+    $stmt->bind_param('i', $id);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$row || !$row['is_active']) {
+        logoutAdmin();
+        header('Location: login.php');
+        exit;
+    }
+
     return $id;
 }
 
