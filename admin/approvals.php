@@ -83,7 +83,7 @@ $pending = $mysqli->query(
     <title>อนุมัติการลงทะเบียน - ระบบลงทะเบียนอภิธรรม</title>
     <link rel="stylesheet" href="../assets/style.css">
 </head>
-<body>
+<body class="admin">
     <h1>อนุมัติการลงทะเบียน</h1>
     <nav>
         <a href="dashboard.php">กลับหน้าแผงควบคุม</a>

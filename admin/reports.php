@@ -245,7 +245,7 @@ $exportHref = 'reports.php?export=csv&view=' . $view . '&sort=' . urlencode($sor
     <title>รายงานการเข้าเรียน - ระบบลงทะเบียนอภิธรรม</title>
     <link rel="stylesheet" href="../assets/style.css">
 </head>
-<body>
+<body class="admin">
     <h1>รายงานการเข้าเรียน</h1>
     <nav>
         <a href="dashboard.php">กลับหน้าแผงควบคุม</a>

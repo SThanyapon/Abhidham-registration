@@ -25,9 +25,9 @@ php -S localhost:8000
 # Apply/reset schema (creates DB abhidham_registration, seeds the 9 class levels)
 mysql -u root -p < schema.sql
 
-# Create an admin user (feature numbers: 1=classes, 2=approvals, 3=reports, 4=promotions,
-# 5=backup; defaults to all 5)
-php scripts/create_admin.php <username> <email> <password> [1,2,3,4,5]
+# Create an admin user (feature numbers: 0=manage admins, 1=classes, 2=approvals, 3=reports,
+# 4=promotions, 5=backup, 6=CSV import, 7=edit student; defaults to all 8)
+php scripts/create_admin.php <username> <email> <password> [0,1,2,3,4,5,6,7]
 
 # Run a manual DB backup (also invoked from admin/backup.php and intended for a scheduled task/cron)
 php cron/backup.php
@@ -59,7 +59,7 @@ block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
   depends on this one. All queries use prepared statements (`bind_param`).
 - `auth.php` — admin session management (`loginAdmin`/`logoutAdmin`/`currentAdminId`) and **per-feature**
   authorization: `requireAdminLogin()` gates on being logged in, `requireFeature($adminId, $n)` gates on
-  the numbered feature (1-5) via the `admin_permissions` table. Every admin page calls both.
+  the numbered feature (0-7) via the `admin_permissions` table. Every admin page calls both.
 - `csrf.php` — `csrfToken()`/`csrfField()`/`verifyCsrf()`. Every POST handler calls `verifyCsrf()`
   first; every form includes `<?= csrfField() ?>`.
 - `rate_limit.php` — sliding-window limiter (`checkRateLimit($formKey, $identifier)` +
@@ -102,10 +102,16 @@ block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
   (registration name whitelist: Thai/English letters, digits, spaces, dashes). This matters for correctness,
   not just tidiness: check-in and lookup match `full_name` by exact equality. Passwords are never
   cleaned.
+- `student_validation.php` — `validateStudentFields()`: cleans and validates the registration-form
+  fields (prefix whitelist `STUDENT_PREFIXES`, required fields, name/age/phone rules) and returns
+  `[$clean, $error]`. Shared by `register.php`, `admin/import_students.php` and `admin/students.php`
+  so all three enforce identical rules. Change validation here, not in the callers.
 
 **UI conventions:** every user-facing string (captions, messages, CSV headers, emails) is Thai, and
 pages use `<html lang="th">` plus the Sarabun Google Font. All styling lives in `assets/style.css`
-(CSS custom properties on `:root`, light-blue theme); reuse its classes rather than inline styles:
+(CSS custom properties on `:root`, light-blue theme; every admin page uses `<body class="admin">`,
+which overrides those properties with an orange theme, so new admin pages must add it too, and new
+colours should be added as tokens rather than hard-coded); reuse its classes rather than inline styles:
 `.error` / `.success` / `.notice` (red / green / amber alerts), `.card`, `.table-wrap` (wrap every
 `<table>` for mobile scrolling), `.required-mark` + `.form-note` (red `*` on required fields),
 `.inline-form` / `.action-row` / `.checkbox-label` (compact forms), `.sort-link` (clickable table
@@ -129,8 +135,14 @@ sessions. Students enroll into a batch as `pending`, get approved (which assigns
 `class_levels.sort_order`, promotions logged in `promotions`).
 
 **Admin feature numbering** (used throughout `admin_permissions` and `requireFeature()` calls):
-1 = class/schedule management, 2 = enrollment approval, 3 = reports, 4 = promotion, 5 = backup.
-Access to each is granted per-admin-user independently — a logged-in admin may not have all five.
+0 = add admin staff (`admin/admins.php`, the web equivalent of `scripts/create_admin.php`),
+1 = class/schedule management, 2 = enrollment approval, 3 = reports, 4 = promotion, 5 = backup, 6 = CSV import
+(`admin/import_students.php`), 7 = edit student details (`admin/students.php`).
+Access to each is granted per-admin-user independently — a logged-in admin may not have all eight. CSV-imported students skip approval:
+they are inserted as `approved` with the file's student ID, batch derived from that ID (all but the last 3
+digits; missing batches are auto-created closed) and an admin-chosen starting level, and
+`noteImportedStudentNo()` in `includes/student_id.php` bumps `student_id_sequences` so later generated IDs
+don't collide. Invalid rows are skipped and reported, not fatal.
 `admin/reports.php` (feature 3) reuses `includes/attendance.php`'s `getAttendanceSummary()` to show
 per-session attendance for one selected student or a summary table for every approved student, with
 a CSV export (`?export=csv`, carries the current `student_id` selection) for either view. The

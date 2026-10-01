@@ -159,7 +159,7 @@ $dayLabels = [
     <title>การจัดการชั้นเรียนและตารางเรียน - ระบบลงทะเบียนอภิธรรม</title>
     <link rel="stylesheet" href="../assets/style.css">
 </head>
-<body>
+<body class="admin">
     <h1>การจัดการชั้นเรียนและตารางเรียน</h1>
     <nav>
         <a href="dashboard.php">กลับหน้าแผงควบคุม</a>

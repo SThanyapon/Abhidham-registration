@@ -8,8 +8,9 @@ data model, feature breakdown, and folder structure for the PHP + MySQL implemen
 - **Student (public, no login)** — registers, checks in to sessions (or just views their attendance
   progress), and looks up their own student ID / registration status.
 - **Admin/Staff (OTP login required)** — manages classes & schedules, approves enrollments,
-  runs attendance reports, promotes students, and runs backups. Access to each of the 5 backend
-  features is granted per-user (not all admins can do all 5 things).
+  runs attendance reports, promotes students, runs backups, imports student lists from CSV, edits
+  student details, and adds admin staff. Access to each of the 8 backend features is granted
+  per-user (not all admins can do all 8 things).
 
 ## 2. Core domain concepts
 
@@ -121,7 +122,7 @@ CREATE TABLE admin_users (
 -- Per-user feature access
 CREATE TABLE admin_permissions (
     admin_user_id INT NOT NULL REFERENCES admin_users(id),
-    feature TINYINT NOT NULL,              -- 1=classes, 2=approvals, 3=reports, 4=promotions, 5=backup
+    feature TINYINT NOT NULL,              -- 0=admins, 1=classes, 2=approvals, 3=reports, 4=promotions, 5=backup, 6=import, 7=edit students
     PRIMARY KEY (admin_user_id, feature)
 );
 
@@ -218,6 +219,11 @@ OTP login: 6-digit code emailed to the admin's registered email, hashed and stor
 a session is created; every admin page checks `admin_permissions` for the relevant feature
 number before allowing access.
 
+### Feature 0 — Manage admin staff
+`admin/admins.php`, the web equivalent of `scripts/create_admin.php`. It creates an admin user
+(username, email for OTP, password ≥ 8 chars, plus the features 0-7 to grant) and lists the
+existing admins with their features. Editing or deactivating admins is not supported.
+
 ### Feature 1 — Class management
 - Open/close registration per batch (`batches.registration_open`).
 - Create a `class_instance` (batch + level + start date).
@@ -296,6 +302,30 @@ emails a notification (with the file path, not the file itself — the mailer ha
 support) to a configured recipient. The recipient and backup directory are configured in
 `config.local.php`; the schedule lives in the cron/Task Scheduler entry.
 
+### Feature 6 — Import students from CSV
+`admin/import_students.php`. Upload a CSV (≤ 2 MB, header row first; a template is downloadable
+via `?template=1`) with the registration-form columns plus student ID, in this order:
+รหัสนักศึกษา, คำนำหน้า, ระบุคำนำหน้า, ชื่อ-นามสกุล, อายุ, ที่อยู่, เบอร์โทรศัพท์, Line ID, ผู้แนะนำ.
+UTF-8 (with or without BOM) and Windows-874 files are both accepted.
+- Imported students are inserted directly as `approved` with the student ID from the file — no
+  approval step.
+- The **batch** comes from the student ID: every digit except the last 3 (the group digit and
+  2-digit sequence, section 5). A batch that doesn't exist yet is created with registration closed.
+- The **starting class level** is chosen by the admin on the import screen and applies to every
+  student in that upload.
+- Rows are validated with the same rules as registration (section 4.1). A row is **skipped**, and
+  listed with its row number and reason, if it fails validation, its student ID already exists (in
+  the DB or earlier in the file), or its name already belongs to an approved/pending student.
+  Valid rows are still imported.
+- Each imported ID raises `student_id_sequences.last_seq` for its batch + group (inverting the
+  section 5 digit math, `noteImportedStudentNo()`), so later auto-generated IDs don't collide.
+
+### Feature 7 — Edit student details
+`admin/students.php`. The admin enters a student ID **and** full name (both must match exactly),
+then can edit prefix, name, age, address, phone, Line ID and referrer, with the same validation as
+registration. Student ID, batch, level and status are not editable here. A new name may not clash
+with another approved/pending student, because check-in and lookup match on exact name.
+
 ## 6. Security
 
 - **Rate limiting**, thresholds read from `config.local.php['rate_limit']`, sliding window per
@@ -334,6 +364,7 @@ support) to a configured recipient. The recipient and backup directory are confi
 │   ├── attendance.php      (getAttendanceSummary(), see section 4.2)
 │   ├── backup.php          (runBackup())
 │   ├── input.php           (whitespace cleanup + name validation for user input)
+│   ├── student_validation.php (validateStudentFields(), shared by register/import/edit)
 │   ├── student_helpers.php (studentPrefix(), studentClassInstanceId())
 │   └── date_helpers.php    (formatDateBEShort())
 ├── scripts/
@@ -343,11 +374,14 @@ support) to a configured recipient. The recipient and backup directory are confi
 │   ├── login.php
 │   ├── verify_otp.php
 │   ├── dashboard.php
+│   ├── admins.php         (feature 0)
 │   ├── classes.php        (feature 1)
 │   ├── approvals.php      (feature 2)
 │   ├── reports.php        (feature 3)
 │   ├── promotions.php     (feature 4)
-│   └── backup.php         (feature 5)
+│   ├── backup.php         (feature 5)
+│   ├── import_students.php (feature 6)
+│   └── students.php       (feature 7)
 ├── cron/
 │   ├── backup.php
 │   └── clear_expired_otp.php
@@ -400,6 +434,10 @@ support) to a configured recipient. The recipient and backup directory are confi
 - **Thai UI and light-blue theme** — every user-facing caption, message, CSV header and email is
   in Thai (`lang="th"`, Sarabun font). The ผู้ดูแลระบบ link on public pages sits apart at the right
   of the menu on a dark-blue background; ออกจากระบบ on admin pages sits at the right in red.
+  Admin pages (`<body class="admin">`) use an orange theme so staff can tell at a glance that
+  they're in the backend.
+- **Features 0, 6 and 7 added after initial design** — manage admins, CSV import and edit student. On an
+  existing database, grant them to current admins with the one-off SQL in README.md.
 - **Whitespace normalization** — all free-text input is trimmed and internal whitespace (incl.
   non-breaking and zero-width spaces from Thai keyboards) collapsed, because check-in and lookup
   match `full_name` by exact equality. `scripts/normalize_whitespace.php` cleaned rows stored

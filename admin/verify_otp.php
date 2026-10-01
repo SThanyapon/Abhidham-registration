@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>ยืนยันรหัส - ระบบลงทะเบียนอภิธรรม</title>
     <link rel="stylesheet" href="../assets/style.css">
 </head>
-<body>
+<body class="admin">
     <h1>กรอกรหัสยืนยันการเข้าสู่ระบบ</h1>
     <p>ระบบได้ส่งรหัส 6 หลักไปยังอีเมลที่คุณลงทะเบียนไว้แล้ว</p>
 

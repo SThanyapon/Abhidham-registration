@@ -89,7 +89,7 @@ $students = $mysqli->query(
     <title>เลื่อนชั้นนักศึกษา - ระบบลงทะเบียนอภิธรรม</title>
     <link rel="stylesheet" href="../assets/style.css">
 </head>
-<body>
+<body class="admin">
     <h1>เลื่อนชั้นนักศึกษา</h1>
     <nav>
         <a href="dashboard.php">กลับหน้าแผงควบคุม</a>

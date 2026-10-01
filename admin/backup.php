@@ -35,7 +35,7 @@ $triggerLabels = ['manual' => 'ด้วยตนเอง', 'scheduled' => 'ต
     <title>สำรองฐานข้อมูล - ระบบลงทะเบียนอภิธรรม</title>
     <link rel="stylesheet" href="../assets/style.css">
 </head>
-<body>
+<body class="admin">
     <h1>สำรองฐานข้อมูล</h1>
     <nav>
         <a href="dashboard.php">กลับหน้าแผงควบคุม</a>

@@ -23,13 +23,16 @@ $stmt->close();
     <title>แผงควบคุม - ระบบลงทะเบียนอภิธรรม</title>
     <link rel="stylesheet" href="../assets/style.css">
 </head>
-<body>
+<body class="admin">
     <h1>แผงควบคุมสำหรับผู้ดูแลระบบ</h1>
     <nav>
         <a class="nav-logout" href="logout.php">ออกจากระบบ</a>
     </nav>
 
     <div class="card feature-links">
+        <?php if (in_array(0, $features, true)): ?>
+            <a href="admins.php">0) จัดการผู้ดูแลระบบ</a>
+        <?php endif; ?>
         <?php if (in_array(1, $features, true)): ?>
             <a href="classes.php">1) จัดการชั้นเรียนและตารางเรียน</a>
         <?php endif; ?>
@@ -44,6 +47,12 @@ $stmt->close();
         <?php endif; ?>
         <?php if (in_array(5, $features, true)): ?>
             <a href="backup.php">5) การสำรองข้อมูล</a>
+        <?php endif; ?>
+        <?php if (in_array(6, $features, true)): ?>
+            <a href="import_students.php">6) นำเข้ารายชื่อนักศึกษา (CSV)</a>
+        <?php endif; ?>
+        <?php if (in_array(7, $features, true)): ?>
+            <a href="students.php">7) แก้ไขข้อมูลนักศึกษา</a>
         <?php endif; ?>
         <?php if ($features === []): ?>
             <p>คุณไม่มีสิทธิ์ในการเข้าถึงฟีเจอร์ผู้ดูแลระบบใด ๆ โปรดขอให้ผู้ดูแลระบบคนอื่นให้สิทธิ์การเข้าถึง</p>

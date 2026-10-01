@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>เข้าสู่ระบบผู้ดูแล - ระบบลงทะเบียนอภิธรรม</title>
     <link rel="stylesheet" href="../assets/style.css">
 </head>
-<body>
+<body class="admin">
     <h1>เข้าสู่ระบบผู้ดูแล</h1>
 
     <?php if ($error): ?>

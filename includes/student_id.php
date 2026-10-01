@@ -68,3 +68,31 @@ function generateStudentNo(mysqli $mysqli, int $batchId, int $batchNo, string $p
 
     return $batchNo . $groupDigit . str_pad((string) $seqInBucket, 2, '0', STR_PAD_LEFT);
 }
+
+/**
+ * Records an externally assigned student_no (CSV import) in student_id_sequences, so that later
+ * generateStudentNo() calls for the same batch+group continue after it instead of colliding.
+ * Inverts generateStudentNo()'s digit math: group digit 0/1 -> that group, seq = last 2 digits;
+ * group digit d >= 2 -> group 2, seq = (d - 2) * 99 + last 2 digits. Never lowers last_seq.
+ * Expects a digits-only student_no of at least 4 characters.
+ */
+function noteImportedStudentNo(mysqli $mysqli, int $batchId, string $studentNo): void
+{
+    $groupDigit = (int) $studentNo[strlen($studentNo) - 3];
+    $seqInBucket = (int) substr($studentNo, -2);
+
+    if ($seqInBucket < 1) {
+        return; // "00" is never generated, so it can't collide with a generated ID
+    }
+
+    $group = min($groupDigit, 2);
+    $seq = $groupDigit >= 2 ? ($groupDigit - 2) * 99 + $seqInBucket : $seqInBucket;
+
+    $stmt = $mysqli->prepare(
+        'INSERT INTO student_id_sequences (batch_id, prefix_group, last_seq) VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE last_seq = GREATEST(last_seq, VALUES(last_seq))'
+    );
+    $stmt->bind_param('iii', $batchId, $group, $seq);
+    $stmt->execute();
+    $stmt->close();
+}
