@@ -2,14 +2,17 @@
 
 A PHP + MySQL classroom management system for the Abhidhamma course: public
 registration/check-in/student-ID lookup, plus an OTP-protected admin backend for
-managing classes, approvals, reports, promotions, and backups. See `DESIGN.md` for the full
-data model and feature design derived from the original requirements.
+managing admin accounts, classes, approvals, reports, promotions, CSV student imports, student
+details, and backups. See `DESIGN.md` for the full data model and feature design derived from the
+original requirements.
 
 ## Requirements
 
 - PHP 8.0+ (the codebase uses `match` expressions and typed properties). The production VM
   runs PHP 8.5.
 - MySQL/MariaDB with the `mysqli` extension.
+- The `iconv` extension (bundled with most PHP builds) for importing CSV files saved in Windows-874
+  (Thai Excel's default); UTF-8 CSVs don't need it.
 
 ## Setup
 
@@ -38,7 +41,21 @@ data model and feature design derived from the original requirements.
      session to check in, or leave them blank to just view attendance progress
    - `/lookup.php` — find a student ID by name; also tells pending/rejected applicants their
      registration status
-   - `/admin/login.php` — admin backend (username/password, then an emailed OTP code)
+   - `/admin/login.php` — admin backend (username/password, then an emailed OTP code). The
+     dashboard shows, in two columns, only the features the admin has been granted:
+
+     | # | Page | Feature |
+     |---|------|---------|
+     | 0 | `admin/admins.php` | Manage admins: create, reset password, enable/disable, delete |
+     | 1 | `admin/classes.php` | Batches, class instances and session schedules |
+     | 2 | `admin/approvals.php` | Approve/reject registrations (assigns student IDs) |
+     | 3 | `admin/reports.php` | Attendance and rejected-applicant reports, CSV export |
+     | 4 | `admin/promotions.php` | Promote students to the next level |
+     | 6 | `admin/import_students.php` | Import already-approved students from CSV |
+     | 7 | `admin/students.php` | Edit one student's details (by student ID + name) |
+     | 9 | `admin/backup.php` | Back up the database now, view backup history |
+
+     Admin pages use an orange theme; public pages are light blue.
 
 The UI is entirely in Thai and loads the Sarabun font from Google Fonts (falls back to the system
 font when offline).
@@ -109,6 +126,13 @@ one can brute-force an account:
 - Only the นาย/นาง/นางสาว/อื่นๆ student-ID group has an auto-rollover for batches
   with more than 99 students; พระ and the สิกขามานา/สามเณร/สามเณรี/แม่ชี group fall
   back to manual ID entry in that (unlikely) case — see `DESIGN.md` section 5.
+- An admin's feature permissions are set when the account is created and can't be changed from
+  the UI afterwards (only password, enabled state, or deletion). Adjust `admin_permissions` in SQL
+  if needed.
+- An admin who has promoted students can't be deleted (`promotions.promoted_by` keeps that
+  history); disable the account instead.
+- The CSV import reads columns by position, not by header name, and always skips the first row,
+  so keep the template's column order.
 - Sorting Thai names/prefixes in the admin report uses MySQL's collation, which doesn't apply Thai
   leading-vowel ordering (e.g. แม่ชี sorts after สามเณร). Proper Thai sorting would need PHP's
   `intl` extension.

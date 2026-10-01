@@ -7,9 +7,9 @@ data model, feature breakdown, and folder structure for the PHP + MySQL implemen
 
 - **Student (public, no login)** — registers, checks in to sessions (or just views their attendance
   progress), and looks up their own student ID / registration status.
-- **Admin/Staff (OTP login required)** — manages classes & schedules, approves enrollments,
-  runs attendance reports, promotes students, runs backups, imports student lists from CSV, edits
-  student details, and adds admin staff. Access to each of the 8 backend features is granted
+- **Admin/Staff (OTP login required)** — manages admin accounts, classes & schedules, approves
+  enrollments, runs attendance reports, promotes students, imports student lists from CSV, edits
+  student details, and runs backups. Access to each of the 8 backend features is granted
   per-user (not all admins can do all 8 things).
 
 ## 2. Core domain concepts
@@ -18,11 +18,13 @@ data model, feature breakdown, and folder structure for the PHP + MySQL implemen
   student ID and which registration form is currently open.
 - **Class / Level** — a study level. Fixed progression path:
   `จูฬตรี → จูฬโท → จูฬเอก → มัชฌิมตรี → มัชฌิมโท → มัชฌิมเอก → มหาตรี → มหาโท → มหาเอก`.
-  New registrations always start at `จูฬตรี` (requirement #14).
+  New registrations always start at `จูฬตรี` (requirement #14). Students imported from CSV
+  (Feature 6) start at a level the admin chooses for that upload.
 - **Session** — one class meeting/lecture, generated from a recurring schedule
   (e.g. every Tue & Thu) or edited individually.
 - **Enrollment** — a student's registration record for a รุ่น, starting as `pending`
-  until an admin approves it.
+  until an admin approves it. CSV-imported students skip this and are stored as `approved`
+  with their existing student ID.
 - **Check-in** — an attendance record tying a student to a session.
 
 ## 3. Database schema
@@ -101,7 +103,8 @@ CREATE TABLE promotions (
 
 -- Tracks the running count per (batch, prefix group) for student ID generation.
 -- last_seq is a running COUNT (0-based), not the last bucket-local number — see section 5
--- for how it maps to {group_digit}{2-digit seq}.
+-- for how it maps to {group_digit}{2-digit seq}. CSV imports raise it past each imported ID
+-- (never lower it) so generated IDs don't collide (Feature 6).
 CREATE TABLE student_id_sequences (
     batch_id INT NOT NULL REFERENCES batches(id),
     prefix_group TINYINT NOT NULL,         -- 0, 1, or 2 (see section 5)
@@ -216,8 +219,13 @@ spot a typo.
 
 OTP login: 6-digit code emailed to the admin's registered email, hashed and stored in
 `otp_codes` with an expiry (e.g. 5 minutes), rate-limited per account. After OTP verification,
-a session is created; every admin page checks `admin_permissions` for the relevant feature
-number before allowing access.
+a session is created; every admin page checks that the account still exists and is active
+(`requireAdminLogin()`), then checks `admin_permissions` for the relevant feature number before
+allowing access.
+
+The dashboard (`admin/dashboard.php`) lists only the features the admin holds, as a two-column grid
+of cards (one column on screens narrower than 480px), in feature-number order: 0, 1, 2, 3, 4, 6, 7, 9.
+Number 5 is unused (see section 9).
 
 ### Feature 0 — Manage admin staff
 `admin/admins.php`, the web equivalent of `scripts/create_admin.php`. It creates an admin user
@@ -349,9 +357,14 @@ support) to a configured recipient. The recipient and backup directory are confi
     code independent of source IP.
 - Passwords hashed with `password_hash()` (bcrypt); OTP codes hashed at rest, single-use,
   short-lived.
-- All admin actions (approve, promote, schedule change, backup) should be attributable to
-  the acting `admin_users.id` — already covered by `promoted_by` / `backup_runs.triggered_by`
-  and worth extending to an audit log if the project grows.
+- Admin accounts: a disabled or deleted account is rejected at login and also logged out on
+  its next request (`requireAdminLogin()` re-checks `is_active`). Resetting a password deletes the
+  account's pending OTP codes. An admin can't disable or delete their own account, so at least one
+  active admin with feature 0 always remains.
+- Attribution: only promotions record the acting admin (`promotions.promoted_by`).
+  `backup_runs.triggered_by` records manual vs. scheduled, not who. Approvals, schedule changes,
+  CSV imports, student edits and admin-account changes aren't attributed. Worth adding an audit log
+  if the project grows.
 
 ## 7. Folder structure
 
@@ -442,7 +455,7 @@ support) to a configured recipient. The recipient and backup directory are confi
   primary-key collision on admins who already hold both) when deploying this change to an
   existing database; a fresh `schema.sql` install is unaffected since it seeds no permission
   rows itself.
-- **Thai UI and light-blue theme** — every user-facing caption, message, CSV header and email is
+- **Thai UI; light-blue public / orange admin theme** — every user-facing caption, message, CSV header and email is
   in Thai (`lang="th"`, Sarabun font). The ผู้ดูแลระบบ link on public pages sits apart at the right
   of the menu on a dark-blue background; ออกจากระบบ on admin pages sits at the right in red.
   Admin pages (`<body class="admin">`) use an orange theme so staff can tell at a glance that
@@ -452,6 +465,11 @@ support) to a configured recipient. The recipient and backup directory are confi
 - **Backup moved from feature 5 to feature 9** — feature 5 is now unused. On an existing database
   run `UPDATE admin_permissions SET feature = 9 WHERE feature = 5;` (no collision, since 9 was
   unused before).
+- **Two-column dashboard** — the admin dashboard's feature cards are a fixed two-column grid
+  (one column on phones) instead of an auto-fill grid.
+- **Admin account management** — Feature 0 originally only created admins. It now also resets
+  passwords, enables/disables accounts and deletes them (Feature 0, section 5). Deletion is refused
+  for admins with promotion history, so disabling is the normal way to retire an account.
 - **Whitespace normalization** — all free-text input is trimmed and internal whitespace (incl.
   non-breaking and zero-width spaces from Thai keyboards) collapsed, because check-in and lookup
   match `full_name` by exact equality. `scripts/normalize_whitespace.php` cleaned rows stored

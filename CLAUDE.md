@@ -6,8 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A PHP + MySQL classroom management system for the Abhidhamma course ("Abhidham Registration"): public
 student registration/check-in/student-ID lookup, plus an OTP-protected admin backend for managing
-classes, approvals, reports, promotions, and backups. Plain PHP, no framework, no Composer/npm
-dependencies.
+admin accounts, classes, approvals, reports, promotions, CSV student imports, student details, and
+backups. Plain PHP, no framework, no Composer/npm dependencies.
 
 `DESIGN.md` is the source of truth for the data model and feature spec (derived from the original
 requirements doc) — read it before making schema or business-logic changes, especially the student ID
@@ -60,8 +60,8 @@ block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
 - `auth.php` — admin session management (`loginAdmin`/`logoutAdmin`/`currentAdminId`) and **per-feature**
   authorization: `requireAdminLogin()` gates on being logged in and on the account still existing with
   `is_active = 1` (so disabling/deleting an admin in `admin/admins.php` ends their session on the next
-  request), `requireFeature($adminId, $n)` gates on
-  the numbered feature (0-4, 6, 7, 9) via the `admin_permissions` table. Every admin page calls both.
+  request), and `requireFeature($adminId, $n)` gates on the numbered feature (0-4, 6, 7, 9) via the
+  `admin_permissions` table. Every admin page calls both.
 - `csrf.php` — `csrfToken()`/`csrfField()`/`verifyCsrf()`. Every POST handler calls `verifyCsrf()`
   first; every form includes `<?= csrfField() ?>`.
 - `rate_limit.php` — sliding-window limiter (`checkRateLimit($formKey, $identifier)` +
@@ -81,7 +81,9 @@ block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
   avoid races, then derives `{batch_no}{group_digit}{2-digit seq}`. The นาย/นาง/นางสาว/อื่นๆ group
   overflows its group digit from 2 up through 9 once a batch passes 99 in that group; the other two
   groups have no rollover and rely on the `UNIQUE` constraint on `students.student_no` plus manual
-  admin override if they ever exceed 99. Don't change the digit-math without re-reading DESIGN.md §5.
+  admin override if they ever exceed 99. `noteImportedStudentNo()` is the inverse, used by the CSV
+  import: it raises `last_seq` past an externally supplied ID so later generated IDs don't collide.
+  Don't change the digit-math in either without re-reading DESIGN.md §5.
 - `attendance.php` — `getAttendanceSummary()`: builds the check-in grid and % complete. The denominator
   is sessions whose date is on/before the *most recent past session's date* (not a fixed "today" cutoff,
   and not counting future scheduled sessions) — this is a deliberate business rule, not a bug.
@@ -117,7 +119,9 @@ colours should be added as tokens rather than hard-coded); reuse its classes rat
 `.error` / `.success` / `.notice` (red / green / amber alerts), `.card`, `.table-wrap` (wrap every
 `<table>` for mobile scrolling), `.required-mark` + `.form-note` (red `*` on required fields),
 `.inline-form` / `.action-row` / `.checkbox-label` (compact forms), `.sort-link` (clickable table
-headers), `.view-toggle` (pill switch between views), `.field-group`, and the nav classes
+headers), `.view-toggle` (pill switch between views), `.field-group`, `button.danger` /
+`button.secondary`, `.feature-links` (the dashboard's two-column card grid, one column under
+480px), and the nav classes
 `.nav-admin` (public pages' ผู้ดูแลระบบ link, right-aligned, dark blue) and `.nav-logout` (admin
 pages' ออกจากระบบ link, right-aligned, red). Validate on the server even when the form has
 `required`/`pattern` attributes; `register.php` redirects back with the entered values in
@@ -132,20 +136,31 @@ calling `includes/backup.php`'s `runBackup('scheduled')`.
 **Domain model** (see DESIGN.md §2-3 for full schema): batches (รุ่น, numbered cohorts with an
 open/closed registration flag) contain class_instances (one per class level), which have generated
 sessions. Students enroll into a batch as `pending`, get approved (which assigns `student_no` and sets
-`current_class_level_id`), check in to sessions, and get promoted through the fixed level progression
+`current_class_level_id`), or are imported from CSV straight as `approved`; they then check in to
+sessions and get promoted through the fixed level progression
 `จูฬตรี → จูฬโท → จูฬเอก → มัชฌิมตรี → มัชฌิมโท → มัชฌิมเอก → มหาตรี → มหาโท → มหาเอก` (order enforced by
 `class_levels.sort_order`, promotions logged in `promotions`).
 
 **Admin feature numbering** (used throughout `admin_permissions` and `requireFeature()` calls):
-0 = add admin staff (`admin/admins.php`, the web equivalent of `scripts/create_admin.php`),
-1 = class/schedule management, 2 = enrollment approval, 3 = reports, 4 = promotion, 6 = CSV import
-(`admin/import_students.php`), 7 = edit student details (`admin/students.php`), 9 = backup (5 is
-unused; backup was moved from 5 to 9).
-Access to each is granted per-admin-user independently — a logged-in admin may not have all eight. CSV-imported students skip approval:
-they are inserted as `approved` with the file's student ID, batch derived from that ID (all but the last 3
-digits; missing batches are auto-created closed) and an admin-chosen starting level, and
-`noteImportedStudentNo()` in `includes/student_id.php` bumps `student_id_sequences` so later generated IDs
-don't collide. Invalid rows are skipped and reported, not fatal.
+0 = manage admin staff (`admin/admins.php`), 1 = class/schedule management, 2 = enrollment approval,
+3 = reports, 4 = promotion, 6 = CSV import (`admin/import_students.php`), 7 = edit student details
+(`admin/students.php`), 9 = backup. Number 5 is unused (backup was moved from 5 to 9), and the
+dashboard lists links in that numeric order. Access to each is granted per-admin-user independently,
+so a logged-in admin may not have all eight.
+
+`admin/admins.php` (feature 0) is the web equivalent of `scripts/create_admin.php`. It also has a
+per-account panel (`?edit=<id>`) to reset the password (which clears pending OTP codes), enable or
+disable the account, or delete it. Admins can't disable or delete themselves. Deleting is refused
+when `promotions.promoted_by` references the account, so the audit trail stays intact. Feature
+permissions can't be edited after creation.
+
+`admin/import_students.php` (feature 6): CSV-imported students skip approval. They're inserted as
+`approved` with the file's student ID, a batch derived from that ID (all but the last 3 digits; a
+missing batch is auto-created with registration closed) and a starting level the admin chooses.
+`noteImportedStudentNo()` bumps `student_id_sequences`. Invalid rows are skipped and reported, not
+fatal. `admin/students.php` (feature 7) looks a student up by exact ID + name and edits their
+contact details; student ID, batch, level and status are read-only there.
+
 `admin/reports.php` (feature 3) reuses `includes/attendance.php`'s `getAttendanceSummary()` to show
 per-session attendance for one selected student or a summary table for every approved student, with
 a CSV export (`?export=csv`, carries the current `student_id` selection) for either view. The
