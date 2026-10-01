@@ -122,7 +122,7 @@ CREATE TABLE admin_users (
 -- Per-user feature access
 CREATE TABLE admin_permissions (
     admin_user_id INT NOT NULL REFERENCES admin_users(id),
-    feature TINYINT NOT NULL,              -- 0=admins, 1=classes, 2=approvals, 3=reports, 4=promotions, 5=backup, 6=import, 7=edit students
+    feature TINYINT NOT NULL,              -- 0=admins, 1=classes, 2=approvals, 3=reports, 4=promotions, 6=import, 7=edit students, 9=backup (5 unused)
     PRIMARY KEY (admin_user_id, feature)
 );
 
@@ -221,7 +221,7 @@ number before allowing access.
 
 ### Feature 0 — Manage admin staff
 `admin/admins.php`, the web equivalent of `scripts/create_admin.php`. It creates an admin user
-(username, email for OTP, password ≥ 8 chars, plus the features 0-7 to grant) and lists the
+(username, email for OTP, password ≥ 8 chars, plus the features to grant) and lists the
 existing admins with their features. Editing or deactivating admins is not supported.
 
 ### Feature 1 — Class management
@@ -295,13 +295,6 @@ Restricted to admins with feature 4 permission. Select approved students who pas
 exam and advance `current_class_level_id` to the next level per the fixed progression order
 in `class_levels.sort_order`; every promotion is logged in `promotions`.
 
-### Feature 5 — Backup
-Manual "สำรองข้อมูลตอนนี้" (backup now) action plus a scheduled job (Windows Task Scheduler / cron calling
-`cron/backup.php`) that dumps the database to a timestamped `.sql` text file on the server and
-emails a notification (with the file path, not the file itself — the mailer has no attachment
-support) to a configured recipient. The recipient and backup directory are configured in
-`config.local.php`; the schedule lives in the cron/Task Scheduler entry.
-
 ### Feature 6 — Import students from CSV
 `admin/import_students.php`. Upload a CSV (≤ 2 MB, header row first; a template is downloadable
 via `?template=1`) with the registration-form columns plus student ID, in this order:
@@ -325,6 +318,13 @@ UTF-8 (with or without BOM) and Windows-874 files are both accepted.
 then can edit prefix, name, age, address, phone, Line ID and referrer, with the same validation as
 registration. Student ID, batch, level and status are not editable here. A new name may not clash
 with another approved/pending student, because check-in and lookup match on exact name.
+
+### Feature 9 — Backup
+Manual "สำรองข้อมูลตอนนี้" (backup now) action plus a scheduled job (Windows Task Scheduler / cron calling
+`cron/backup.php`) that dumps the database to a timestamped `.sql` text file on the server and
+emails a notification (with the file path, not the file itself — the mailer has no attachment
+support) to a configured recipient. The recipient and backup directory are configured in
+`config.local.php`; the schedule lives in the cron/Task Scheduler entry.
 
 ## 6. Security
 
@@ -379,9 +379,9 @@ with another approved/pending student, because check-in and lookup match on exac
 │   ├── approvals.php      (feature 2)
 │   ├── reports.php        (feature 3)
 │   ├── promotions.php     (feature 4)
-│   ├── backup.php         (feature 5)
 │   ├── import_students.php (feature 6)
-│   └── students.php       (feature 7)
+│   ├── students.php       (feature 7)
+│   └── backup.php         (feature 9)
 ├── cron/
 │   ├── backup.php
 │   └── clear_expired_otp.php
@@ -438,6 +438,9 @@ with another approved/pending student, because check-in and lookup match on exac
   they're in the backend.
 - **Features 0, 6 and 7 added after initial design** — manage admins, CSV import and edit student. On an
   existing database, grant them to current admins with the one-off SQL in README.md.
+- **Backup moved from feature 5 to feature 9** — feature 5 is now unused. On an existing database
+  run `UPDATE admin_permissions SET feature = 9 WHERE feature = 5;` (no collision, since 9 was
+  unused before).
 - **Whitespace normalization** — all free-text input is trimmed and internal whitespace (incl.
   non-breaking and zero-width spaces from Thai keyboards) collapsed, because check-in and lookup
   match `full_name` by exact equality. `scripts/normalize_whitespace.php` cleaned rows stored

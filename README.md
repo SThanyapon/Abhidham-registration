@@ -22,10 +22,10 @@ data model and feature design derived from the original requirements.
    ```
 3. Create your first admin user:
    ```
-   php scripts/create_admin.php <username> <email> <password> 0,1,2,3,4,5,6,7
+   php scripts/create_admin.php <username> <email> <password> 0,1,2,3,4,6,7,9
    ```
-   Feature numbers: 0=manage admins, 1=classes, 2=approvals, 3=reports, 4=promotions, 5=backup, 6=CSV import,
-   7=edit student (defaults to all 8). After that, more admin staff can be added
+   Feature numbers: 0=manage admins, 1=classes, 2=approvals, 3=reports, 4=promotions, 6=CSV import,
+   7=edit student, 9=backup (defaults to all 8; 5 is unused). After that, more admin staff can be added
    from `/admin/admins.php` (feature 0).
 4. Run a local PHP server:
    ```
@@ -67,6 +67,10 @@ Point Windows Task Scheduler (or cron on Linux) at both on whatever interval you
   ```sql
   INSERT IGNORE INTO admin_permissions (admin_user_id, feature)
   SELECT u.id, f.n FROM admin_users u CROSS JOIN (SELECT 0 n UNION SELECT 6 UNION SELECT 7) f;
+  ```
+- Backup was renumbered from feature 5 to feature 9. On a database set up before that, run once:
+  ```sql
+  UPDATE admin_permissions SET feature = 9 WHERE feature = 5;
   ```
 - `scripts/normalize_whitespace.php` — one-off cleanup that applies the input whitespace rules
   (`includes/input.php`) to rows stored before those rules existed. Idempotent; back up first.

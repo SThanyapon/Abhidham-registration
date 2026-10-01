@@ -45,14 +45,14 @@ $stmt->close();
         <?php if (in_array(4, $features, true)): ?>
             <a href="promotions.php">4) การเลื่อนชั้นนักศึกษา</a>
         <?php endif; ?>
-        <?php if (in_array(5, $features, true)): ?>
-            <a href="backup.php">5) การสำรองข้อมูล</a>
-        <?php endif; ?>
         <?php if (in_array(6, $features, true)): ?>
             <a href="import_students.php">6) นำเข้ารายชื่อนักศึกษา (CSV)</a>
         <?php endif; ?>
         <?php if (in_array(7, $features, true)): ?>
             <a href="students.php">7) แก้ไขข้อมูลนักศึกษา</a>
+        <?php endif; ?>
+        <?php if (in_array(9, $features, true)): ?>
+            <a href="backup.php">9) การสำรองข้อมูล</a>
         <?php endif; ?>
         <?php if ($features === []): ?>
             <p>คุณไม่มีสิทธิ์ในการเข้าถึงฟีเจอร์ผู้ดูแลระบบใด ๆ โปรดขอให้ผู้ดูแลระบบคนอื่นให้สิทธิ์การเข้าถึง</p>

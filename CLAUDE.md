@@ -26,8 +26,8 @@ php -S localhost:8000
 mysql -u root -p < schema.sql
 
 # Create an admin user (feature numbers: 0=manage admins, 1=classes, 2=approvals, 3=reports,
-# 4=promotions, 5=backup, 6=CSV import, 7=edit student; defaults to all 8)
-php scripts/create_admin.php <username> <email> <password> [0,1,2,3,4,5,6,7]
+# 4=promotions, 6=CSV import, 7=edit student, 9=backup; 5 is unused; defaults to all 8)
+php scripts/create_admin.php <username> <email> <password> [0,1,2,3,4,6,7,9]
 
 # Run a manual DB backup (also invoked from admin/backup.php and intended for a scheduled task/cron)
 php cron/backup.php
@@ -59,7 +59,7 @@ block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
   depends on this one. All queries use prepared statements (`bind_param`).
 - `auth.php` — admin session management (`loginAdmin`/`logoutAdmin`/`currentAdminId`) and **per-feature**
   authorization: `requireAdminLogin()` gates on being logged in, `requireFeature($adminId, $n)` gates on
-  the numbered feature (0-7) via the `admin_permissions` table. Every admin page calls both.
+  the numbered feature (0-4, 6, 7, 9) via the `admin_permissions` table. Every admin page calls both.
 - `csrf.php` — `csrfToken()`/`csrfField()`/`verifyCsrf()`. Every POST handler calls `verifyCsrf()`
   first; every form includes `<?= csrfField() ?>`.
 - `rate_limit.php` — sliding-window limiter (`checkRateLimit($formKey, $identifier)` +
@@ -136,8 +136,9 @@ sessions. Students enroll into a batch as `pending`, get approved (which assigns
 
 **Admin feature numbering** (used throughout `admin_permissions` and `requireFeature()` calls):
 0 = add admin staff (`admin/admins.php`, the web equivalent of `scripts/create_admin.php`),
-1 = class/schedule management, 2 = enrollment approval, 3 = reports, 4 = promotion, 5 = backup, 6 = CSV import
-(`admin/import_students.php`), 7 = edit student details (`admin/students.php`).
+1 = class/schedule management, 2 = enrollment approval, 3 = reports, 4 = promotion, 6 = CSV import
+(`admin/import_students.php`), 7 = edit student details (`admin/students.php`), 9 = backup (5 is
+unused; backup was moved from 5 to 9).
 Access to each is granted per-admin-user independently — a logged-in admin may not have all eight. CSV-imported students skip approval:
 they are inserted as `approved` with the file's student ID, batch derived from that ID (all but the last 3
 digits; missing batches are auto-created closed) and an admin-chosen starting level, and

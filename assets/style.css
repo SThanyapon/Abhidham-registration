@@ -488,7 +488,7 @@ table form {
 
 .feature-links {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
     background: none;
     box-shadow: none;
@@ -551,6 +551,19 @@ table form {
     background: var(--surface);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
+}
+
+/* Dashboard is 2 columns, but 1 on phones so the Thai labels aren't squeezed */
+@media (max-width: 480px) {
+    .feature-links {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .feature-links {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* Compact forms that sit inline (table cells, approval actions) */
