@@ -27,8 +27,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // A name may have several registrations (e.g. rejected, then re-registered); report the most
         // relevant one: approved, then pending, then rejected, newest first.
         $stmt = $mysqli->prepare(
-            "SELECT student_no, status, prefix, prefix_other FROM students WHERE full_name = ?
-             ORDER BY FIELD(status, 'approved', 'pending', 'rejected'), created_at DESC
+            "SELECT s.student_no, s.status, s.prefix, s.prefix_other, cl.name AS level_name
+             FROM students s
+             LEFT JOIN class_levels cl ON cl.id = s.current_class_level_id
+             WHERE s.full_name = ?
+             ORDER BY FIELD(s.status, 'approved', 'pending', 'rejected'), s.created_at DESC
              LIMIT 1"
         );
         $stmt->bind_param('s', $fullName);
@@ -78,7 +81,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php if ($result === null): ?>
             <p class="error"><?= $nameLine ?>ไม่พบการลงทะเบียนของท่าน กรุณาทำการลงทะเบียนก่อนค่ะ</p>
         <?php elseif ($result['status'] === 'approved'): ?>
-            <p class="success"><?= $nameLine ?>รหัสนักศึกษาของคุณ: <strong><?= htmlspecialchars($result['student_no'] ?? '-') ?></strong></p>
+            <p class="success"><?= $nameLine ?>รหัสนักศึกษาของคุณ: <strong><?= htmlspecialchars($result['student_no'] ?? '-') ?></strong><br>
+                ระดับชั้น: <strong><?= htmlspecialchars($result['level_name'] ?? '-') ?></strong></p>
         <?php elseif ($result['status'] === 'pending'): ?>
             <p class="notice"><?= $nameLine ?>คุณได้ทำการลงทะเบียนแล้ว แต่ยังไม่ได้รับการตรวจสอบจากผู้ดูแลระบบ กรุณาตรวจสอบใหม่ภายหลัง และขอความร่วมมือไม่ลงทะเบียนซ้ำ</p>
         <?php else: ?>

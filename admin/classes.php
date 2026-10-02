@@ -53,11 +53,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif ($action === 'toggle_registration') {
         $batchId = (int) ($_POST['batch_id'] ?? 0);
-        $stmt = $mysqli->prepare('UPDATE batches SET registration_open = NOT registration_open WHERE id = ?');
-        $stmt->bind_param('i', $batchId);
-        $stmt->execute();
-        $stmt->close();
-        $notice = 'อัปเดตสถานะการลงทะเบียนเรียบร้อยแล้ว';
+        // Only the latest batch (highest batch_no) may have its registration opened/closed.
+        $latest = $mysqli->query('SELECT id FROM batches ORDER BY batch_no DESC LIMIT 1')->fetch_assoc();
+
+        if (!$latest || (int) $latest['id'] !== $batchId) {
+            $error = 'เปิด/ปิดรับลงทะเบียนได้เฉพาะรุ่นล่าสุดเท่านั้น';
+        } else {
+            $stmt = $mysqli->prepare('UPDATE batches SET registration_open = NOT registration_open WHERE id = ?');
+            $stmt->bind_param('i', $batchId);
+            $stmt->execute();
+            $stmt->close();
+            $notice = 'อัปเดตสถานะการลงทะเบียนเรียบร้อยแล้ว';
+        }
     } elseif ($action === 'create_class_instance') {
         $batchId = (int) ($_POST['batch_id'] ?? 0);
         $classLevelId = (int) ($_POST['class_level_id'] ?? 0);
@@ -118,17 +125,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $batches = $mysqli->query('SELECT id, batch_no, name, registration_open FROM batches ORDER BY batch_no DESC')
     ->fetch_all(MYSQLI_ASSOC);
+$latestBatchId = isset($batches[0]) ? (int) $batches[0]['id'] : null;
 
 $classLevels = $mysqli->query('SELECT id, name, sort_order FROM class_levels ORDER BY sort_order')
     ->fetch_all(MYSQLI_ASSOC);
 
 $classInstances = $mysqli->query(
-    "SELECT ci.id, ci.start_date, cl.name AS level_name, b.batch_no, b.name AS batch_name
+    "SELECT ci.id, ci.batch_id, ci.start_date, cl.name AS level_name, cl.sort_order, b.batch_no, b.name AS batch_name
      FROM class_instances ci
      JOIN class_levels cl ON cl.id = ci.class_level_id
      JOIN batches b ON b.id = ci.batch_id
      ORDER BY b.batch_no DESC, cl.sort_order"
 )->fetch_all(MYSQLI_ASSOC);
+
+// Schedule management is linked only for each batch's highest class level.
+$maxSortByBatch = [];
+foreach ($classInstances as $class) {
+    $maxSortByBatch[$class['batch_id']] = max($maxSortByBatch[$class['batch_id']] ?? 0, (int) $class['sort_order']);
+}
 
 $selectedClassId = (int) ($_GET['class_instance_id'] ?? 0);
 $sessions = [];
@@ -181,12 +195,14 @@ $dayLabels = [
                     <td><?= htmlspecialchars($batch['name'] ?? '') ?></td>
                     <td><?= $batch['registration_open'] ? 'เปิดลงทะเบียน' : 'ยังไม่เปิดลงทะเบียน' ?></td>
                     <td>
-                        <form action="classes.php" method="post" class="inline-form">
-                            <?= csrfField() ?>
-                            <input type="hidden" name="action" value="toggle_registration">
-                            <input type="hidden" name="batch_id" value="<?= $batch['id'] ?>">
-                            <button type="submit" class="secondary"><?= $batch['registration_open'] ? 'ปิดรับลงทะเบียน' : 'เปิดรับลงทะเบียน' ?></button>
-                        </form>
+                        <?php if ((int) $batch['id'] === $latestBatchId): ?>
+                            <form action="classes.php" method="post" class="inline-form">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="action" value="toggle_registration">
+                                <input type="hidden" name="batch_id" value="<?= $batch['id'] ?>">
+                                <button type="submit" class="secondary"><?= $batch['registration_open'] ? 'ปิดรับลงทะเบียน' : 'เปิดรับลงทะเบียน' ?></button>
+                            </form>
+                        <?php endif; ?>
                     </td>
                 </tr>
             <?php endforeach; ?>
@@ -214,7 +230,11 @@ $dayLabels = [
                     <td><?= htmlspecialchars($class['batch_name'] ?: 'รุ่น ' . $class['batch_no']) ?></td>
                     <td><?= htmlspecialchars($class['level_name']) ?></td>
                     <td><?= htmlspecialchars(formatDateBEShort($class['start_date'])) ?></td>
-                    <td><a href="classes.php?class_instance_id=<?= $class['id'] ?>">จัดการตารางเรียน</a></td>
+                    <td>
+                        <?php if ((int) $class['sort_order'] === $maxSortByBatch[$class['batch_id']]): ?>
+                            <a href="classes.php?class_instance_id=<?= $class['id'] ?>">จัดการตารางเรียน</a>
+                        <?php endif; ?>
+                    </td>
                 </tr>
             <?php endforeach; ?>
         </tbody>

@@ -113,12 +113,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// Only each batch's highest class level (its current class) is offered for check-in.
 $classes = $mysqli->query(
     "SELECT ci.id, cl.name AS level_name, b.batch_no, b.name AS batch_name
      FROM class_instances ci
      JOIN class_levels cl ON cl.id = ci.class_level_id
      JOIN batches b ON b.id = ci.batch_id
-     ORDER BY b.batch_no DESC, cl.sort_order"
+     WHERE cl.sort_order = (
+         SELECT MAX(cl2.sort_order)
+         FROM class_instances ci2
+         JOIN class_levels cl2 ON cl2.id = ci2.class_level_id
+         WHERE ci2.batch_id = ci.batch_id
+     )
+     ORDER BY b.batch_no DESC"
 )->fetch_all(MYSQLI_ASSOC);
 
 $sessionsByClass = [];

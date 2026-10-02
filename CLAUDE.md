@@ -122,7 +122,7 @@ colours should be added as tokens rather than hard-coded); reuse its classes rat
 headers), `.view-toggle` (pill switch between views), `.field-group`, `button.danger` /
 `button.secondary`, `.feature-links` (the dashboard's two-column card grid, one column under
 480px), and the nav classes
-`.nav-admin` (public pages' ผู้ดูแลระบบ link, right-aligned, dark blue) and `.nav-logout` (admin
+`.nav-admin` (public pages' ผู้ดูแลระบบ link, right-aligned, orange) and `.nav-logout` (admin
 pages' ออกจากระบบ link, right-aligned, red). Validate on the server even when the form has
 `required`/`pattern` attributes; `register.php` redirects back with the entered values in
 `$_SESSION['register_old']` so the form can be refilled.

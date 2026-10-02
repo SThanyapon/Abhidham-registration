@@ -183,7 +183,8 @@ check-in/lookup, so extra spaces never cause a name mismatch.
 Menu caption "ลงชื่อ/ตรวจสอบการเข้าเรียน" — the page both records attendance and shows progress.
 Student enters student ID, then name-surname (both **required**, marked `*`; the ID comes first
 since students remember it more reliably than the exact registered spelling of their name), and
-optionally a class and then **selects the ครั้งที่ (session) themselves** from a dropdown of that
+optionally a class (the dropdown lists only each batch's highest class level, i.e. its current
+class) and then **selects the ครั้งที่ (session) themselves** from a dropdown of that
 class's sessions, shown in short Thai Buddhist Era date format (e.g. `17 ก.ย. 69`; no
 auto-detection by date). System:
 1. Verifies ID + name match an approved student, and finds their current class instance
@@ -205,7 +206,7 @@ Rate-limited.
 Name + surname → looks up the registration in any status and shows a status-specific message
 (when a name has several registrations, the most relevant wins: approved, then pending, then
 rejected, newest first):
-- **approved** → shows `student_no`.
+- **approved** → shows `student_no` and ระดับชั้น (current class level).
 - **pending** → "คุณได้ทำการลงทะเบียนแล้ว แต่ยังไม่ได้รับการตรวจสอบจากผู้ดูแลระบบ กรุณาตรวจสอบใหม่ภายหลัง
   และขอความร่วมมือไม่ลงทะเบียนซ้ำ" (discourages duplicate registrations).
 - **rejected** → "คุณไม่ได้รับการอนุมัติการลงทะเบียน ขอบคุณค่ะ".
@@ -244,7 +245,9 @@ admin is always active and holds feature 0, so at least one admin who can manage
 remains. Changing an existing admin's feature permissions isn't supported.
 
 ### Feature 1 — Class management
-- Open/close registration per batch (`batches.registration_open`).
+- Open/close registration (`batches.registration_open`) — only for the latest batch (highest
+  `batch_no`); older batches keep their current flag and show no toggle (also enforced server-side).
+- The จัดการตารางเรียน link is shown only for each batch's highest class level.
 - Create a `class_instance` (batch + level + start date).
 - Generate a recurring schedule: given number of sessions, start date, and days-of-week
   (e.g. Tue+Thu), bulk-insert `sessions` rows numbered sequentially.
