@@ -17,6 +17,8 @@ $attendance = null;
 $fullName = '';
 $studentNo = '';
 $selectedClassInstanceId = null;
+// Sessions dated after today can't be checked in to yet.
+$today = date('Y-m-d');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
@@ -68,9 +70,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $error = 'ชั้นเรียนที่เลือกไม่ตรงกับชั้นเรียนปัจจุบันของท่าน';
                     } else {
                         $sessionStmt = $mysqli->prepare(
-                            'SELECT id FROM sessions WHERE id = ? AND class_instance_id = ? AND is_cancelled = 0'
+                            'SELECT id FROM sessions
+                             WHERE id = ? AND class_instance_id = ? AND is_cancelled = 0 AND session_date <= ?'
                         );
-                        $sessionStmt->bind_param('ii', $sessionId, $classInstanceId);
+                        $sessionStmt->bind_param('iis', $sessionId, $classInstanceId, $today);
                         $sessionStmt->execute();
                         $session = $sessionStmt->get_result()->fetch_assoc();
                         $sessionStmt->close();
@@ -132,9 +135,9 @@ $sessionsByClass = [];
 foreach ($classes as $class) {
     $sessionStmt = $mysqli->prepare(
         'SELECT id, session_number, session_date FROM sessions
-         WHERE class_instance_id = ? AND is_cancelled = 0 ORDER BY session_number'
+         WHERE class_instance_id = ? AND is_cancelled = 0 AND session_date <= ? ORDER BY session_number'
     );
-    $sessionStmt->bind_param('i', $class['id']);
+    $sessionStmt->bind_param('is', $class['id'], $today);
     $sessionStmt->execute();
     $sessions = $sessionStmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $sessionStmt->close();

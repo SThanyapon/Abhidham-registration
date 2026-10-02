@@ -1,5 +1,8 @@
 <?php
 
+// Session dates are Thai calendar days; "today" must roll over at Thai midnight, not UTC.
+date_default_timezone_set('Asia/Bangkok');
+
 $GLOBALS['__config'] = null;
 $GLOBALS['__db'] = null;
 

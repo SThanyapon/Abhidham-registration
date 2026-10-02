@@ -54,7 +54,8 @@ login. There is no templating engine; HTML is written directly in the `.php` fil
 block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
 
 **`includes/` — shared logic, loaded via `require_once`, no autoloading:**
-- `db.php` — `getConfig()` (lazy-loads `config.local.php` into `$GLOBALS`) and `getDbConnection()`
+- `db.php` — sets the PHP timezone to `Asia/Bangkok` (so `date('Y-m-d')` "today" rolls over at
+  Thai midnight), `getConfig()` (lazy-loads `config.local.php` into `$GLOBALS`) and `getDbConnection()`
   (lazy mysqli singleton, `MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT`, utf8mb4). Every other include
   depends on this one. All queries use prepared statements (`bind_param`).
 - `auth.php` — admin session management (`loginAdmin`/`logoutAdmin`/`currentAdminId`) and **per-feature**

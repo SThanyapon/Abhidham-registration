@@ -186,7 +186,8 @@ since students remember it more reliably than the exact registered spelling of t
 optionally a class (the dropdown lists only each batch's highest class level, i.e. its current
 class) and then **selects the ครั้งที่ (session) themselves** from a dropdown of that
 class's sessions, shown in short Thai Buddhist Era date format (e.g. `17 ก.ย. 69`; no
-auto-detection by date). System:
+auto-detection by date). Only sessions dated today or earlier (Asia/Bangkok) are listed, and the
+server refuses a check-in for a future-dated session. System:
 1. Verifies ID + name match an approved student, and finds their current class instance
    (`studentClassInstanceId()`, batch + current level). No class instance yet → a notice, no grid.
 2. **Check-in mode** (class and session both chosen): the class must be the student's current
