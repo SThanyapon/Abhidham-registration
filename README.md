@@ -69,8 +69,9 @@ An admin needs to, via `/admin/classes.php`:
 ## Scheduled jobs
 
 - `cron/backup.php` — CLI script (`php cron/backup.php`) that dumps the database
-  to a timestamped `.sql` file under the configured `backup.directory` and emails
-  a notification. Run it weekly (e.g. Saturday night).
+  to a timestamped, gzip-compressed `.sql.gz` file under the configured `backup.directory`
+  and emails it as an attachment to the recipients set on the backup page. Run it weekly
+  (e.g. Saturday night).
 - `cron/clear_expired_otp.php` — CLI script that deletes expired rows from
   `otp_codes`. Run it frequently (e.g. hourly), since OTP codes are short-lived.
 
@@ -89,6 +90,14 @@ Point Windows Task Scheduler (or cron on Linux) at both on whatever interval you
   ```sql
   UPDATE admin_permissions SET feature = 9 WHERE feature = 5;
   ```
+- The `app_settings` table (backup email recipients) was added later. On a database set up before
+  it, run once:
+  ```sql
+  CREATE TABLE IF NOT EXISTS app_settings (
+      setting_key VARCHAR(100) PRIMARY KEY,
+      setting_value TEXT NOT NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  ```
 - `scripts/normalize_whitespace.php` — one-off cleanup that applies the input whitespace rules
   (`includes/input.php`) to rows stored before those rules existed. Idempotent; back up first.
 
@@ -105,7 +114,8 @@ Production runs the app as a git checkout of this repo, owned by the web server 
 4. Lint: `php -l` on the changed files, then smoke-test the affected pages.
 
 To roll back, `git reset --hard <previous commit>` in the app directory (and restore the backup
-with `mysql <db name> < backups/<file>.sql` if data was changed).
+with `gunzip -c backups/<file>.sql.gz | mysql <db name>` if data was changed; older backups are
+plain `.sql`: `mysql <db name> < backups/<file>.sql`).
 
 ## Rate limiting
 
@@ -121,8 +131,8 @@ one can brute-force an account:
 ## Known simplifications
 
 - The SMTP mailer (`includes/mailer.php`) is a minimal hand-rolled client (OTP and
-  backup notification emails only, plain text, no attachments). Swap in PHPMailer
-  if you need HTML email or attaching the backup file itself.
+  backup emails only, plain-text body with optional attachments). Swap in PHPMailer
+  if you need HTML email.
 - Only the นาย/นาง/นางสาว/อื่นๆ student-ID group has an auto-rollover for batches
   with more than 99 students; พระ and the สิกขามานา/สามเณร/สามเณรี/แม่ชี group fall
   back to manual ID entry in that (unlikely) case — see `DESIGN.md` section 5.

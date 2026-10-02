@@ -75,8 +75,8 @@ block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
 - `otp.php` — 6-digit OTP generation/verification for admin login, hashed at rest in `otp_codes`,
   single-use, TTL from config.
 - `mailer.php` — a hand-rolled minimal SMTP client (`sendEmail`) used for OTP codes and backup
-  notifications. Plain text only, no attachments, no Composer/PHPMailer dependency. Swap this file if
-  HTML email or attachments are ever needed.
+  files. Plain-text body plus optional attachments (`multipart/mixed`, base64), with SMTP
+  dot-stuffing; no Composer/PHPMailer dependency. Swap this file if HTML email is ever needed.
 - `student_id.php` — `generateStudentNo()`: the student ID allocation algorithm. Uses a
   `FOR UPDATE`-locked transaction on `student_id_sequences` (per batch + prefix group running count) to
   avoid races, then derives `{batch_no}{group_digit}{2-digit seq}`. The นาย/นาง/นางสาว/อื่นๆ group
@@ -88,10 +88,12 @@ block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
 - `attendance.php` — `getAttendanceSummary()`: builds the check-in grid and % complete. The denominator
   is sessions whose date is on/before the *most recent past session's date* (not a fixed "today" cutoff,
   and not counting future scheduled sessions) — this is a deliberate business rule, not a bug.
-- `backup.php` — `runBackup()`: pure-PHP `SHOW CREATE TABLE` + row dump to a timestamped `.sql` file
-  under `config.local.php['backup']['directory']` (no dependency on the `mysqldump` binary), logs to
-  `backup_runs`, emails a notification (without the file attached, since `mailer.php` has no attachment
-  support).
+- `backup.php` — `runBackup()`: pure-PHP `SHOW CREATE TABLE` + row dump, gzip-compressed to a
+  timestamped `.sql.gz` file under `config.local.php['backup']['directory']` (no dependency on the
+  `mysqldump` binary), emailed as an attachment to each recipient, logged to `backup_runs`.
+  Recipients come from `getBackupRecipients()`: the comma-separated `backup_recipient_email` row in
+  the `app_settings` key/value table (edited in `admin/backup.php` via `saveBackupRecipients()`),
+  falling back to `config.local.php['backup']['recipient_email']` until one is saved.
 - `student_helpers.php` — `studentPrefix()` (display prefix: `prefix_other` when `prefix` is
   `อื่นๆ`) and `studentClassInstanceId()` (class instance for a student's batch + current level;
   `null` if not created yet). Used by `checkin.php`, `lookup.php`, `admin/approvals.php`,
@@ -156,8 +158,9 @@ when `promotions.promoted_by` references the account, so the audit trail stays i
 permissions can't be edited after creation.
 
 `admin/import_students.php` (feature 6): CSV-imported students skip approval. They're inserted as
-`approved` with the file's student ID, a batch derived from that ID (all but the last 3 digits; a
-missing batch is auto-created with registration closed) and a starting level the admin chooses.
+`approved` with the file's student ID, a batch derived from that ID (all but the last 3 digits) and
+a starting level the admin chooses. Batches are never auto-created: if any row references a batch
+that doesn't exist, the whole file is refused (nothing imported) and the missing batch numbers listed.
 `noteImportedStudentNo()` bumps `student_id_sequences`. Invalid rows are skipped and reported, not
 fatal. `admin/students.php` (feature 7) looks a student up by exact ID + name and edits their
 contact details; student ID, batch, level and status are read-only there.
@@ -171,4 +174,6 @@ IDs sort numerically). Stored columns sort in SQL; the computed attendance colum
 the CSV export follows the same order. A `?view=approved|rejected` toggle (default `approved`)
 switches to a list of rejected applicants (contact details + application date, sortable by
 prefix/name/batch/date, newest first by default, with its own CSV export); rejected rows have no
-`student_no` or level, so that view skips the `class_levels` join.
+`student_no` or level, so that view skips the `class_levels` join. Optional filters `?batch_id=`
+(both views) and `?level_id=` (current level, approved view only) narrow the table, the student
+dropdown and the CSV export; `filterQuery()` carries them through sort, export and view links.

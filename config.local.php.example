@@ -33,6 +33,7 @@ return [
 
     'backup' => [
         'directory' => __DIR__ . '/backups',
+        // Fallback only: once recipients are saved in admin/backup.php they're stored in app_settings.
         'recipient_email' => 'admin@example.com',
     ],
 ];

@@ -62,6 +62,30 @@ function readUploadedCsvText(string $path): ?string
     return $content;
 }
 
+// Batch numbers (all but the last 3 digits of the student ID, DESIGN.md §5) referenced by the data
+// rows. Rows whose ID is malformed are left for the per-row validation to report.
+function importBatchNumbers(string $text): array
+{
+    $stream = fopen('php://temp', 'r+');
+    fwrite($stream, $text);
+    rewind($stream);
+
+    $batchNos = [];
+    $rowNumber = 0;
+    while (($cells = fgetcsv($stream, 0, ',', '"', '')) !== false) {
+        if (++$rowNumber === 1) {
+            continue; // header row
+        }
+        $studentNo = cleanCode((string) ($cells[0] ?? ''));
+        if (preg_match('/^[0-9]{4,10}$/', $studentNo) && (int) substr($studentNo, 0, -3) >= 1) {
+            $batchNos[(int) substr($studentNo, 0, -3)] = true;
+        }
+    }
+    fclose($stream);
+
+    return array_keys($batchNos);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
     $selectedLevelId = (int) ($_POST['class_level_id'] ?? 0);
@@ -76,6 +100,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (($text = readUploadedCsvText($upload['tmp_name'])) === null) {
         $error = 'ไม่สามารถอ่านไฟล์ได้ กรุณาบันทึกไฟล์เป็น CSV (UTF-8) แล้วลองใหม่';
     } else {
+        // Batches must already exist: refuse the whole file if any referenced batch is missing.
+        $batchIds = []; // batch_no => batches.id
+        $missingBatches = [];
+        $findBatch = $mysqli->prepare('SELECT id FROM batches WHERE batch_no = ?');
+        foreach (importBatchNumbers($text) as $batchNo) {
+            $findBatch->bind_param('i', $batchNo);
+            $findBatch->execute();
+            $batchRow = $findBatch->get_result()->fetch_assoc();
+            if ($batchRow) {
+                $batchIds[$batchNo] = (int) $batchRow['id'];
+            } else {
+                $missingBatches[] = $batchNo;
+            }
+        }
+        $findBatch->close();
+
+        if ($missingBatches !== []) {
+            sort($missingBatches);
+            $error = 'แฟ้มข้อมูลปรากฎรุ่นนักศึกษาที่ยังไม่มีในระบบ  กรุณาทำการสร้างรุ่นของนักศึกษาในระบบเสียก่อน'
+                . ' (รุ่น: ' . implode(', ', $missingBatches) . ')';
+        }
+    }
+
+    if ($error === null) {
         $stream = fopen('php://temp', 'r+');
         fwrite($stream, $text);
         rewind($stream);
@@ -83,8 +131,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fieldKeys = array_keys(IMPORT_COLUMNS);
         $seenNos = [];
         $seenNames = [];
-        $batchIds = []; // batch_no => batches.id, cached across rows
-        $createdBatches = [];
         $imported = 0;
         $rowNumber = 0;
 
@@ -92,7 +138,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $findName = $mysqli->prepare(
             "SELECT 1 FROM students WHERE full_name = ? AND status IN ('approved', 'pending')"
         );
-        $findBatch = $mysqli->prepare('SELECT id FROM batches WHERE batch_no = ?');
         $insert = $mysqli->prepare(
             'INSERT INTO students (student_no, prefix, prefix_other, full_name, age, address, phone, line_id,
                                    reference_person, batch_id, current_class_level_id, status)
@@ -148,23 +193,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $seenNames[$student['full_name']] = $rowNumber;
 
             // Batch = every digit except the last 3 (group digit + 2-digit sequence), see DESIGN.md §5.
-            $batchNo = (int) substr($studentNo, 0, -3);
-            if (!isset($batchIds[$batchNo])) {
-                $findBatch->bind_param('i', $batchNo);
-                $findBatch->execute();
-                $batchRow = $findBatch->get_result()->fetch_assoc();
-                if ($batchRow) {
-                    $batchIds[$batchNo] = (int) $batchRow['id'];
-                } else {
-                    $createBatch = $mysqli->prepare('INSERT INTO batches (batch_no, registration_open) VALUES (?, 0)');
-                    $createBatch->bind_param('i', $batchNo);
-                    $createBatch->execute();
-                    $batchIds[$batchNo] = (int) $createBatch->insert_id;
-                    $createBatch->close();
-                    $createdBatches[] = $batchNo;
-                }
-            }
-            $batchId = $batchIds[$batchNo];
+            // All batches were confirmed to exist before the import started.
+            $batchId = $batchIds[(int) substr($studentNo, 0, -3)];
 
             try {
                 $insert->bind_param(
@@ -193,13 +223,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $findNo->close();
         $findName->close();
-        $findBatch->close();
         $insert->close();
         fclose($stream);
 
         $summary = "นำเข้านักศึกษาสำเร็จ $imported คน ชั้น" . $levelNames[$selectedLevelId]
-            . ($skipped !== [] ? ' ข้าม ' . count($skipped) . ' แถว' : '')
-            . ($createdBatches !== [] ? ' (สร้างรุ่นใหม่: ' . implode(', ', $createdBatches) . ' - ปิดรับลงทะเบียนไว้)' : '');
+            . ($skipped !== [] ? ' ข้าม ' . count($skipped) . ' แถว' : '');
     }
 }
 ?>
@@ -236,7 +264,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="card">
         <p>นักศึกษาที่นำเข้าจะได้รับการอนุมัติทันทีโดยใช้รหัสนักศึกษาตามไฟล์ รุ่นจะคำนวณจากรหัสนักศึกษา
-           (ตัวเลขทั้งหมดยกเว้น 3 หลักสุดท้าย) หากยังไม่มีรุ่นนั้นในระบบ จะสร้างรุ่นใหม่ให้โดยปิดรับลงทะเบียนไว้</p>
+           (ตัวเลขทั้งหมดยกเว้น 3 หลักสุดท้าย) หากยังไม่มีรุ่นนั้นในระบบ ระบบจะไม่นำเข้าไฟล์
+           กรุณาสร้างรุ่นในหน้าการจัดการชั้นเรียนก่อน</p>
         <p>ไฟล์ต้องมีแถวหัวตารางในแถวแรก และเรียงคอลัมน์ดังนี้:
            <?= htmlspecialchars(implode(', ', IMPORT_COLUMNS)) ?></p>
         <p><a href="import_students.php?template=1">ดาวน์โหลดไฟล์ตัวอย่าง (CSV)</a></p>

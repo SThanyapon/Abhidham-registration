@@ -128,6 +128,12 @@ CREATE TABLE backup_runs (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Admin-editable settings (key/value), e.g. backup_recipient_email (comma-separated)
+CREATE TABLE app_settings (
+    setting_key VARCHAR(100) PRIMARY KEY,
+    setting_value TEXT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Seed the fixed class level progression path
 INSERT INTO class_levels (name, sort_order) VALUES
     ('จูฬตรี', 1),

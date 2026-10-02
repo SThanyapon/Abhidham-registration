@@ -3,11 +3,12 @@
 require_once __DIR__ . '/db.php';
 
 /**
- * Minimal SMTP client (no attachments) so the app doesn't require Composer/PHPMailer
- * just to send OTP codes and backup notifications. Swap for PHPMailer if you need
- * attachments, HTML email, or more robust error handling.
+ * Minimal SMTP client so the app doesn't require Composer/PHPMailer just to send OTP codes and
+ * backups. Plain-text body plus optional attachments, each
+ * ['filename' => string, 'content' => raw bytes, 'mime' => string]. Swap for PHPMailer if you need
+ * HTML email or more robust error handling.
  */
-function sendEmail(string $to, string $subject, string $body): bool
+function sendEmail(string $to, string $subject, string $body, array $attachments = []): bool
 {
     $config = getConfig()['mail'];
 
@@ -67,9 +68,32 @@ function sendEmail(string $to, string $subject, string $body): bool
     $headers .= "To: <$to>\r\n";
     $headers .= 'Subject: =?UTF-8?B?' . base64_encode($subject) . "?=\r\n";
     $headers .= "MIME-Version: 1.0\r\n";
-    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
 
-    $write($headers . "\r\n" . $body . "\r\n.");
+    $body = str_replace(["\r\n", "\r"], "\n", $body);
+    if ($attachments === []) {
+        $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+        $message = $body;
+    } else {
+        $boundary = 'b_' . bin2hex(random_bytes(12));
+        $headers .= "Content-Type: multipart/mixed; boundary=\"$boundary\"\r\n";
+        $message = "--$boundary\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\n\n"
+            . $body . "\n";
+        foreach ($attachments as $attachment) {
+            $filename = str_replace(['"', "\r", "\n"], '', $attachment['filename']);
+            $message .= "--$boundary\n"
+                . "Content-Type: {$attachment['mime']}; name=\"$filename\"\n"
+                . "Content-Transfer-Encoding: base64\n"
+                . "Content-Disposition: attachment; filename=\"$filename\"\n\n"
+                . chunk_split(base64_encode($attachment['content']), 76, "\n");
+        }
+        $message .= "--$boundary--\n";
+    }
+
+    // SMTP DATA: CRLF line endings, and a line starting with "." is escaped by doubling it.
+    $message = preg_replace('/^\./m', '..', $message);
+    $message = str_replace("\n", "\r\n", $message);
+
+    $write($headers . "\r\n" . $message . "\r\n.");
     $sendResponse = $read();
     $write('QUIT');
     fclose($socket);

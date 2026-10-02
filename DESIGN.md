@@ -158,6 +158,12 @@ CREATE TABLE backup_runs (
     emailed_to VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Admin-editable key/value settings, e.g. backup_recipient_email (comma-separated)
+CREATE TABLE app_settings (
+    setting_key VARCHAR(100) PRIMARY KEY,
+    setting_value TEXT NOT NULL
+);
 ```
 
 ## 4. Public features
@@ -305,7 +311,12 @@ all approved students at once:
 date). Sortable by prefix/name/batch/date, newest first by default. Rejected rows have no
 `student_no` or `current_class_level_id`, so this view queries without the `class_levels` join.
 
-Every view can be exported to CSV (`?export=csv`, carrying the current view, sort and student
+**Filters** — a รุ่น dropdown (both views) and a ระดับชั้น dropdown (current level; approved view
+only), `?batch_id=` / `?level_id=`, default all. They narrow the summary table, the student
+dropdown and the CSV export, and are kept across sorting and view switching (ระดับชั้น is dropped
+on the rejected view). Changing a filter resets the student selection to all students.
+
+Every view can be exported to CSV (`?export=csv`, carrying the current view, filters, sort and student
 selection) — session-by-session for a single student, the summary table for all students, or the
 rejected list. UTF-8 BOM-prefixed so Thai text renders correctly in Excel.
 
@@ -326,7 +337,10 @@ UTF-8 (with or without BOM) and Windows-874 files are both accepted.
 - Imported students are inserted directly as `approved` with the student ID from the file — no
   approval step.
 - The **batch** comes from the student ID: every digit except the last 3 (the group digit and
-  2-digit sequence, section 5). A batch that doesn't exist yet is created with registration closed.
+  2-digit sequence, section 5). Batches are **not** created by the import: if any row's batch
+  doesn't exist yet, the whole file is refused (nothing imported) with "แฟ้มข้อมูลปรากฎรุ่นนักศึกษาที่ยังไม่มีในระบบ
+  กรุณาทำการสร้างรุ่นของนักศึกษาในระบบเสียก่อน" plus the missing batch numbers; the admin creates
+  them in Feature 1 and re-uploads.
 - The **starting class level** is chosen by the admin on the import screen and applies to every
   student in that upload.
 - Rows are validated with the same rules as registration (section 4.1). A row is **skipped**, and
@@ -344,10 +358,12 @@ with another approved/pending student, because check-in and lookup match on exac
 
 ### Feature 9 — Backup
 Manual "สำรองข้อมูลตอนนี้" (backup now) action plus a scheduled job (Windows Task Scheduler / cron calling
-`cron/backup.php`) that dumps the database to a timestamped `.sql` text file on the server and
-emails a notification (with the file path, not the file itself — the mailer has no attachment
-support) to a configured recipient. The recipient and backup directory are configured in
-`config.local.php`; the schedule lives in the cron/Task Scheduler entry.
+`cron/backup.php`) that dumps the database to a timestamped, gzip-compressed `.sql.gz` file on
+the server and emails it as an attachment to each backup recipient. Recipients are edited on the
+backup page (comma-separated, each validated as an email) and stored in
+`app_settings.backup_recipient_email`; until saved, `config.local.php['backup']['recipient_email']`
+is used. The backup directory is configured in `config.local.php`; the schedule lives in the
+cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db name>`.
 
 ## 6. Security
 

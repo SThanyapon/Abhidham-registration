@@ -3,21 +3,48 @@
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/backup.php';
+require_once __DIR__ . '/../includes/input.php';
 
 $adminId = requireAdminLogin();
 requireFeature($adminId, 9);
 
 $mysqli = getDbConnection();
 $notice = null;
+$error = null;
+$recipientsInput = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
+    $action = $_POST['action'] ?? '';
 
-    if (($_POST['action'] ?? '') === 'backup_now') {
+    if ($action === 'update_recipients') {
+        $recipientsInput = cleanText($_POST['recipient_emails'] ?? '');
+        $emails = array_values(array_filter(array_map('trim', explode(',', $recipientsInput)), static fn ($e) => $e !== ''));
+        $invalid = array_filter($emails, static fn ($e) => filter_var($e, FILTER_VALIDATE_EMAIL) === false);
+
+        if ($emails === []) {
+            $error = 'กรุณาระบุอีเมลผู้รับอย่างน้อย 1 อีเมล';
+        } elseif ($invalid !== []) {
+            $error = 'อีเมลไม่ถูกต้อง: ' . implode(', ', $invalid);
+        } elseif (mb_strlen(implode(', ', $emails)) > 255) {
+            $error = 'รายการอีเมลยาวเกินไป (ไม่เกิน 255 ตัวอักษร)';
+        } else {
+            saveBackupRecipients(array_values(array_unique($emails)));
+            $recipientsInput = null;
+            $notice = 'บันทึกอีเมลผู้รับเรียบร้อยแล้ว';
+        }
+    } elseif ($action === 'backup_now') {
         $result = runBackup('manual');
-        $notice = 'สำรองข้อมูลเรียบร้อยแล้วที่ ' . $result['file_path'] . ($result['emailed'] ? ' และส่งอีเมลแจ้งเตือนแล้ว' : ' (ส่งอีเมลแจ้งเตือนไม่สำเร็จ - กรุณาตรวจสอบการตั้งค่าอีเมล)');
+        if ($result['emailed']) {
+            $notice = 'สำรองข้อมูลเรียบร้อยแล้วที่ ' . $result['file_path'] . ' และส่งไฟล์ (บีบอัด) ทางอีเมลแล้ว';
+        } else {
+            $error = 'สำรองข้อมูลเรียบร้อยแล้วที่ ' . $result['file_path']
+                . ' แต่ส่งอีเมลไม่สำเร็จ - กรุณาตรวจสอบอีเมลผู้รับและการตั้งค่าอีเมล';
+        }
     }
 }
+
+$currentRecipients = implode(', ', getBackupRecipients());
 
 $runs = $mysqli->query('SELECT file_path, triggered_by, emailed_to, created_at FROM backup_runs ORDER BY id DESC LIMIT 20')
     ->fetch_all(MYSQLI_ASSOC);
@@ -43,6 +70,19 @@ $triggerLabels = ['manual' => 'ด้วยตนเอง', 'scheduled' => 'ต
     </nav>
 
     <?php if ($notice): ?><p class="success"><?= htmlspecialchars($notice) ?></p><?php endif; ?>
+    <?php if ($error): ?><p class="error"><?= htmlspecialchars($error) ?></p><?php endif; ?>
+
+    <div class="card">
+        <form action="backup.php" method="post">
+            <?= csrfField() ?>
+            <input type="hidden" name="action" value="update_recipients">
+            <label for="recipient_emails">อีเมลผู้รับไฟล์สำรองข้อมูล<span class="required-mark">*</span></label>
+            <input type="text" id="recipient_emails" name="recipient_emails" required
+                   value="<?= htmlspecialchars($recipientsInput ?? $currentRecipients) ?>">
+            <p class="form-note">คั่นหลายอีเมลด้วยเครื่องหมายจุลภาค (,) ไฟล์สำรองข้อมูลจะถูกบีบอัด (.sql.gz) และแนบไปกับอีเมล</p>
+            <button type="submit" class="secondary">บันทึก</button>
+        </form>
+    </div>
 
     <form action="backup.php" method="post">
         <?= csrfField() ?>

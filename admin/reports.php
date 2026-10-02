@@ -15,6 +15,25 @@ $mysqli = getDbConnection();
 // rejected. Rejected rows have no student_no/level/attendance, so they get their own columns.
 $view = ($_GET['view'] ?? '') === 'rejected' ? 'rejected' : 'approved';
 
+// Optional filters (0 = all): รุ่น for both views, ระดับชั้น (current level) for approved only.
+$batchOptions = $mysqli->query('SELECT id, batch_no, name AS batch_name FROM batches ORDER BY batch_no DESC')
+    ->fetch_all(MYSQLI_ASSOC);
+$levelOptions = $mysqli->query('SELECT id, name FROM class_levels ORDER BY sort_order')->fetch_all(MYSQLI_ASSOC);
+$filterBatchId = (int) ($_GET['batch_id'] ?? 0);
+$filterLevelId = $view === 'approved' ? (int) ($_GET['level_id'] ?? 0) : 0;
+if (!in_array($filterBatchId, array_map('intval', array_column($batchOptions, 'id')), true)) {
+    $filterBatchId = 0;
+}
+if (!in_array($filterLevelId, array_map('intval', array_column($levelOptions, 'id')), true)) {
+    $filterLevelId = 0;
+}
+
+// Query-string suffix that carries the active filters through sort, export and view links.
+function filterQuery(int $batchId, int $levelId): string
+{
+    return ($batchId > 0 ? '&batch_id=' . $batchId : '') . ($levelId > 0 ? '&level_id=' . $levelId : '');
+}
+
 if ($view === 'approved') {
     // Sortable columns for the all-students table: key => header label. Default: student ID ascending.
     $sortColumns = [
@@ -69,14 +88,20 @@ if ($view === 'approved') {
         default => 's.student_no IS NULL, LENGTH(s.student_no), s.student_no',
     };
 
-    $students = $mysqli->query(
+    $stmt = $mysqli->prepare(
         "SELECT s.id, s.student_no, s.prefix, s.prefix_other, s.full_name, cl.name AS level_name, b.batch_no, b.name AS batch_name
          FROM students s
          JOIN class_levels cl ON cl.id = s.current_class_level_id
          JOIN batches b ON b.id = s.batch_id
          WHERE s.status = 'approved'
+           AND (? = 0 OR s.batch_id = ?)
+           AND (? = 0 OR s.current_class_level_id = ?)
          ORDER BY $orderBy"
-    )->fetch_all(MYSQLI_ASSOC);
+    );
+    $stmt->bind_param('iiii', $filterBatchId, $filterBatchId, $filterLevelId, $filterLevelId);
+    $stmt->execute();
+    $students = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
 } else {
     $orderBy = match ($sort) {
         'prefix' => "$prefixOrder, s.created_at DESC",
@@ -86,14 +111,19 @@ if ($view === 'approved') {
     };
 
     // No class-level join: rejected students never get a level assigned.
-    $rejected = $mysqli->query(
+    $stmt = $mysqli->prepare(
         "SELECT s.id, s.prefix, s.prefix_other, s.full_name, s.age, s.phone, s.line_id, s.reference_person,
                 s.created_at, b.batch_no, b.name AS batch_name
          FROM students s
          JOIN batches b ON b.id = s.batch_id
          WHERE s.status = 'rejected'
+           AND (? = 0 OR s.batch_id = ?)
          ORDER BY $orderBy"
-    )->fetch_all(MYSQLI_ASSOC);
+    );
+    $stmt->bind_param('ii', $filterBatchId, $filterBatchId);
+    $stmt->execute();
+    $rejected = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
 }
 
 $selectedStudentId = $view === 'approved' ? (int) ($_GET['student_id'] ?? 0) : 0;
@@ -145,7 +175,7 @@ if ($view === 'approved' && $selectedStudentId === 0) {
     }
 }
 
-function sortHeader(string $key, string $label, string $sort, string $dir, string $view): string
+function sortHeader(string $key, string $label, string $sort, string $dir, string $view, string $filters): string
 {
     $isActive = $key === $sort;
     $nextDir = $isActive && $dir === 'asc' ? 'desc' : 'asc';
@@ -153,8 +183,9 @@ function sortHeader(string $key, string $label, string $sort, string $dir, strin
         ? '<span class="sort-indicator">' . ($dir === 'asc' ? '▲' : '▼') . '</span>'
         : '<span class="sort-indicator inactive">↕</span>';
 
-    return '<a class="sort-link" href="reports.php?view=' . $view . '&amp;sort=' . urlencode($key)
-        . '&amp;dir=' . $nextDir . '">' . htmlspecialchars($label) . $indicator . '</a>';
+    $href = 'reports.php?view=' . $view . '&sort=' . urlencode($key) . '&dir=' . $nextDir . $filters;
+
+    return '<a class="sort-link" href="' . htmlspecialchars($href) . '">' . htmlspecialchars($label) . $indicator . '</a>';
 }
 
 function batchLabel(array $row): string
@@ -231,8 +262,9 @@ if ($exportCsv) {
     exit;
 }
 
+$filters = filterQuery($filterBatchId, $filterLevelId);
 $exportHref = 'reports.php?export=csv&view=' . $view . '&sort=' . urlencode($sort) . '&dir=' . $dir
-    . ($selectedStudentId > 0 ? '&student_id=' . $selectedStudentId : '');
+    . ($selectedStudentId > 0 ? '&student_id=' . $selectedStudentId : '') . $filters;
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -253,13 +285,36 @@ $exportHref = 'reports.php?export=csv&view=' . $view . '&sort=' . urlencode($sor
     </nav>
 
     <div class="view-toggle">
-        <a href="reports.php?view=approved" class="<?= $view === 'approved' ? 'active' : '' ?>">นักศึกษาที่อนุมัติแล้ว</a>
-        <a href="reports.php?view=rejected" class="<?= $view === 'rejected' ? 'active' : '' ?>">ผู้สมัครที่ไม่ได้รับการอนุมัติ</a>
+        <a href="reports.php?view=approved<?= filterQuery($filterBatchId, 0) ?>" class="<?= $view === 'approved' ? 'active' : '' ?>">นักศึกษาที่อนุมัติแล้ว</a>
+        <a href="reports.php?view=rejected<?= filterQuery($filterBatchId, 0) ?>" class="<?= $view === 'rejected' ? 'active' : '' ?>">ผู้สมัครที่ไม่ได้รับการอนุมัติ</a>
     </div>
 
-    <?php if ($view === 'approved'): ?>
-        <form action="reports.php" method="get">
-            <input type="hidden" name="view" value="approved">
+    <form action="reports.php" method="get">
+        <input type="hidden" name="view" value="<?= $view ?>">
+        <input type="hidden" name="sort" value="<?= htmlspecialchars($sort) ?>">
+        <input type="hidden" name="dir" value="<?= $dir ?>">
+
+        <label for="batch_id">รุ่น</label>
+        <select id="batch_id" name="batch_id" onchange="resetStudentAndSubmit(this.form)">
+            <option value="0">-- ทุกรุ่น --</option>
+            <?php foreach ($batchOptions as $batch): ?>
+                <option value="<?= (int) $batch['id'] ?>" <?= $filterBatchId === (int) $batch['id'] ? 'selected' : '' ?>>
+                    <?= htmlspecialchars(batchLabel($batch)) ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+
+        <?php if ($view === 'approved'): ?>
+            <label for="level_id">ระดับชั้น</label>
+            <select id="level_id" name="level_id" onchange="resetStudentAndSubmit(this.form)">
+                <option value="0">-- ทุกระดับชั้น --</option>
+                <?php foreach ($levelOptions as $level): ?>
+                    <option value="<?= (int) $level['id'] ?>" <?= $filterLevelId === (int) $level['id'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($level['name']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+
             <label for="student_id">นักศึกษา</label>
             <select id="student_id" name="student_id" onchange="this.form.submit()">
                 <option value="0" <?= $selectedStudentId === 0 ? 'selected' : '' ?>>-- นักศึกษาทั้งหมด --</option>
@@ -269,9 +324,19 @@ $exportHref = 'reports.php?export=csv&view=' . $view . '&sort=' . urlencode($sor
                     </option>
                 <?php endforeach; ?>
             </select>
-            <button type="submit">ดูรายงาน</button>
-        </form>
-    <?php endif; ?>
+        <?php endif; ?>
+        <button type="submit">ดูรายงาน</button>
+    </form>
+
+    <script>
+        // A changed filter may exclude the selected student, so go back to "all students".
+        function resetStudentAndSubmit(form) {
+            if (form.student_id) {
+                form.student_id.value = '0';
+            }
+            form.submit();
+        }
+    </script>
 
     <p><a href="<?= htmlspecialchars($exportHref) ?>">ส่งออกรายงานนี้เป็นไฟล์ CSV</a></p>
 
@@ -283,7 +348,7 @@ $exportHref = 'reports.php?export=csv&view=' . $view . '&sort=' . urlencode($sor
                 <thead>
                     <tr>
                         <?php foreach ($sortColumns as $key => $label): ?>
-                            <th><?= in_array($key, $rejectedSortable, true) ? sortHeader($key, $label, $sort, $dir, $view) : htmlspecialchars($label) ?></th>
+                            <th><?= in_array($key, $rejectedSortable, true) ? sortHeader($key, $label, $sort, $dir, $view, $filters) : htmlspecialchars($label) ?></th>
                         <?php endforeach; ?>
                     </tr>
                 </thead>
@@ -334,7 +399,7 @@ $exportHref = 'reports.php?export=csv&view=' . $view . '&sort=' . urlencode($sor
             <thead>
                 <tr>
                     <?php foreach ($sortColumns as $key => $label): ?>
-                        <th><?= sortHeader($key, $label, $sort, $dir, $view) ?></th>
+                        <th><?= sortHeader($key, $label, $sort, $dir, $view, $filters) ?></th>
                     <?php endforeach; ?>
                 </tr>
             </thead>

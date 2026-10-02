@@ -4,11 +4,35 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/mailer.php';
 
 /**
+ * Backup email recipients: the admin-editable list in app_settings, falling back to
+ * config.local.php['backup']['recipient_email'] until one has been saved. Comma-separated.
+ */
+function getBackupRecipients(): array
+{
+    $row = getDbConnection()
+        ->query("SELECT setting_value FROM app_settings WHERE setting_key = 'backup_recipient_email'")
+        ->fetch_assoc();
+    $value = $row ? $row['setting_value'] : (string) (getConfig()['backup']['recipient_email'] ?? '');
+
+    return array_values(array_filter(array_map('trim', explode(',', $value)), static fn ($e) => $e !== ''));
+}
+
+function saveBackupRecipients(array $emails): void
+{
+    $value = implode(', ', $emails);
+    $stmt = getDbConnection()->prepare(
+        "INSERT INTO app_settings (setting_key, setting_value) VALUES ('backup_recipient_email', ?)
+         ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)"
+    );
+    $stmt->bind_param('s', $value);
+    $stmt->execute();
+    $stmt->close();
+}
+
+/**
  * Pure-PHP database dump (structure + data) so this doesn't depend on the
- * mysqldump binary being on PATH. Writes a .sql file and logs the run.
- * Note: the notification email does not attach the file (the minimal SMTP
- * client in mailer.php doesn't support attachments) - retrieve it from the
- * backup directory on the server.
+ * mysqldump binary being on PATH. Writes a gzip-compressed .sql.gz file, emails it as an
+ * attachment to every backup recipient, and logs the run.
  */
 function runBackup(string $triggeredBy): array
 {
@@ -47,22 +71,30 @@ function runBackup(string $triggeredBy): array
 
     $sql .= "SET FOREIGN_KEY_CHECKS=1;\n";
 
-    $filename = 'backup_' . date('Ymd_His') . '.sql';
+    $filename = 'backup_' . date('Ymd_His') . '.sql.gz';
     $filePath = $dir . DIRECTORY_SEPARATOR . $filename;
-    file_put_contents($filePath, $sql);
+    $compressed = gzencode($sql, 9);
+    file_put_contents($filePath, $compressed);
 
-    $recipient = $config['backup']['recipient_email'];
-    $emailed = sendEmail(
-        $recipient,
-        "สำรองฐานข้อมูล - $filename",
-        "ระบบได้สำรองฐานข้อมูลและบันทึกไว้บนเซิร์ฟเวอร์ที่:\n$filePath\n\n"
-            . "(อีเมลแจ้งเตือนนี้ไม่ได้แนบไฟล์สำรองข้อมูลมาด้วย)"
-    );
+    $recipients = getBackupRecipients();
+    $body = "ระบบได้สำรองฐานข้อมูลแล้ว ไฟล์สำรองข้อมูล (บีบอัดแบบ gzip) แนบมากับอีเมลนี้\n"
+        . "และบันทึกไว้บนเซิร์ฟเวอร์ที่:\n$filePath\n\n"
+        . "วิธีกู้คืน: gunzip -c $filename | mysql -u <user> -p {$dbName}";
+    $attachment = ['filename' => $filename, 'content' => $compressed, 'mime' => 'application/gzip'];
 
+    // Emailed only when every recipient's send succeeded (and there was at least one recipient).
+    $emailed = $recipients !== [];
+    foreach ($recipients as $recipient) {
+        if (!sendEmail($recipient, "สำรองฐานข้อมูล - $filename", $body, [$attachment])) {
+            $emailed = false;
+        }
+    }
+
+    $emailedTo = mb_substr(implode(', ', $recipients), 0, 255);
     $stmt = $mysqli->prepare(
         'INSERT INTO backup_runs (file_path, triggered_by, emailed_to) VALUES (?, ?, ?)'
     );
-    $stmt->bind_param('sss', $filePath, $triggeredBy, $recipient);
+    $stmt->bind_param('sss', $filePath, $triggeredBy, $emailedTo);
     $stmt->execute();
     $stmt->close();
 
