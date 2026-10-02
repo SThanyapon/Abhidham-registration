@@ -37,10 +37,11 @@ original requirements.
 5. Open `http://localhost:8000`:
    - `/` — landing page; click "ลงทะเบียน" (Register) (or visit `/?register=1`) to open the
      registration form
-   - `/checkin.php` — "ลงชื่อ/ตรวจสอบการเข้าเรียน": student ID + name, then pick a class and
-     session to check in, or leave them blank to just view attendance progress
-   - `/lookup.php` — find a student ID by name; also tells pending/rejected applicants their
-     registration status
+   - `/checkin.php` — "ลงชื่อ/ตรวจสอบการเข้าเรียน": student ID + name, then pick a class (each
+     batch's current, highest class) and a session dated today or earlier to check in, or leave
+     them blank to just view attendance progress
+   - `/lookup.php` — find a student ID (and current ระดับชั้น) by name; also tells
+     pending/rejected applicants their registration status
    - `/admin/login.php` — admin backend (username/password, then an emailed OTP code). The
      dashboard shows, in two columns, only the features the admin has been granted:
 
@@ -49,11 +50,11 @@ original requirements.
      | 0 | `admin/admins.php` | Manage admins: create, reset password, enable/disable, delete |
      | 1 | `admin/classes.php` | Batches, class instances and session schedules |
      | 2 | `admin/approvals.php` | Approve/reject registrations (assigns student IDs) |
-     | 3 | `admin/reports.php` | Attendance and rejected-applicant reports, CSV export |
+     | 3 | `admin/reports.php` | Attendance and rejected-applicant reports, filter by รุ่น/ระดับชั้น, CSV export |
      | 4 | `admin/promotions.php` | Promote students to the next level |
-     | 6 | `admin/import_students.php` | Import already-approved students from CSV |
+     | 6 | `admin/import_students.php` | Import already-approved students from CSV (their batches must exist) |
      | 7 | `admin/students.php` | Edit one student's details (by student ID + name) |
-     | 9 | `admin/backup.php` | Back up the database now, view backup history |
+     | 9 | `admin/backup.php` | Back up the database now, set backup email recipients, view backup history |
 
      Admin pages use an orange theme; public pages are light blue.
 
@@ -63,8 +64,13 @@ font when offline).
 ## Before students can register or check in
 
 An admin needs to, via `/admin/classes.php`:
-1. Create a batch (รุ่น) and open its registration.
-2. Create a class instance (batch + level) and generate its recurring session schedule.
+1. Create a batch (รุ่น) and open its registration. Only the latest batch (highest number) can
+   have its registration opened or closed.
+2. Create a class instance (batch + level) and generate its recurring session schedule. The
+   schedule link is shown only for each batch's highest class level.
+
+CSV-imported students also need their batch to exist first; the import refuses a file that
+references a batch that hasn't been created.
 
 ## Scheduled jobs
 
@@ -98,6 +104,11 @@ Point Windows Task Scheduler (or cron on Linux) at both on whatever interval you
       setting_value TEXT NOT NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   ```
+- Resetting test data (e.g. before a new round of testing): back up first, then delete, in this
+  FK-safe order, `checkins`, `promotions`, `students`, `student_id_sequences`, `sessions`,
+  `class_instances`, `batches` (and optionally `rate_limit_hits`, `backup_runs`). Use `DELETE`
+  inside a transaction rather than `TRUNCATE` (which fails on FK-referenced tables), then reset
+  `AUTO_INCREMENT = 1`. Admin accounts, permissions, `class_levels` and `app_settings` are kept.
 - `scripts/normalize_whitespace.php` — one-off cleanup that applies the input whitespace rules
   (`includes/input.php`) to rows stored before those rules existed. Idempotent; back up first.
 

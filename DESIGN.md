@@ -477,7 +477,7 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
   rows itself.
 - **Thai UI; light-blue public / orange admin theme** — every user-facing caption, message, CSV header and email is
   in Thai (`lang="th"`, Sarabun font). The ผู้ดูแลระบบ link on public pages sits apart at the right
-  of the menu on a dark-blue background; ออกจากระบบ on admin pages sits at the right in red.
+  of the menu on an orange background (matching the admin theme); ออกจากระบบ on admin pages sits at the right in red.
   Admin pages (`<body class="admin">`) use an orange theme so staff can tell at a glance that
   they're in the backend.
 - **Features 0, 6 and 7 added after initial design** — manage admins, CSV import and edit student. On an
@@ -501,3 +501,18 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
 - **Check-in doubles as a progress view** — class and session became optional; leaving either
   out shows progress without recording attendance (section 4.2).
 - **Rejected applicants in reports** — added as a second report view (section 5, Feature 3).
+- **Only the current class is offered** — the check-in class dropdown lists only each batch's
+  highest class level, and in Feature 1 the จัดการตารางเรียน link appears only for that level.
+  Registration can be opened/closed only for the latest batch (enforced server-side too).
+- **No check-in to future sessions; Asia/Bangkok time** — check-in used to accept any session,
+  including future ones, which progress ignores (it counts only sessions already conducted), so
+  students saw 0 / 0 despite having check-ins. The session dropdown now lists only sessions dated
+  today or earlier, the server refuses future ones, and PHP's timezone is `Asia/Bangkok`
+  (set in `includes/db.php`) so "today" rolls over at Thai midnight rather than 07:00 UTC.
+- **Lookup shows ระดับชั้น** — an approved match also shows the student's current level.
+- **CSV import no longer creates batches** — a file referencing a missing batch is refused
+  whole, so batches are only ever created deliberately in Feature 1.
+- **Report filters** — รุ่น and ระดับชั้น filters on the reports page (section 5, Feature 3).
+- **Backups compressed and emailed** — backups are `.sql.gz` and attached to the email; the
+  recipients (several allowed) are edited on the backup page and stored in the new
+  `app_settings` table. On an existing database, create it with the one-off SQL in README.md.

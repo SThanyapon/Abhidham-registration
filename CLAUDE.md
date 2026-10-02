@@ -157,6 +157,12 @@ disable the account, or delete it. Admins can't disable or delete themselves. De
 when `promotions.promoted_by` references the account, so the audit trail stays intact. Feature
 permissions can't be edited after creation.
 
+"Current class" rules (deliberate, keep them consistent): a batch's current class is its
+class_instance with the highest `class_levels.sort_order`. `checkin.php` offers only that class per
+batch, and only sessions dated today or earlier (future check-ins are refused server-side too).
+`admin/classes.php` shows the จัดการตารางเรียน link only for that class, and allows opening/closing
+registration only for the latest batch (highest `batch_no`, also enforced in the POST handler).
+
 `admin/import_students.php` (feature 6): CSV-imported students skip approval. They're inserted as
 `approved` with the file's student ID, a batch derived from that ID (all but the last 3 digits) and
 a starting level the admin chooses. Batches are never auto-created: if any row references a batch
