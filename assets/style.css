@@ -278,23 +278,74 @@ img.bottom-banner {
     border-radius: var(--radius);
 }
 
-/* Radio-button question (legend + one option per line + optional "อื่นๆ" text box) */
-fieldset.choice-group {
-    border: 0;
-    padding: 0;
-    margin: 0;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
+/* Choice question (includes/student_form.php): caption, then radios / a dropdown, then the
+   "อื่นๆ" text box */
+.choice-field {
     gap: 6px;
 }
 
-fieldset.choice-group legend {
-    font-weight: 600;
-    font-size: 0.95rem;
+.choice-field [hidden] {
+    display: none;
+}
+
+/* Multi-select dropdown: a <details> whose <summary> looks like a <select> */
+.multi-select {
+    position: relative;
+}
+
+.multi-select summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 10px 36px 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-alt);
     color: var(--text);
-    padding: 0;
-    margin-bottom: 6px;
+    position: relative;
+}
+
+.multi-select summary::-webkit-details-marker {
+    display: none;
+}
+
+.multi-select summary::after {
+    content: "▾";
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+}
+
+.multi-select summary.placeholder {
+    color: var(--muted);
+}
+
+.multi-select[open] summary {
+    border-color: var(--primary);
+    background: var(--surface);
+    box-shadow: var(--focus-ring);
+}
+
+.multi-select-options {
+    position: absolute;
+    z-index: 10;
+    left: 0;
+    right: 0;
+    margin-top: 4px;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow);
+}
+
+input:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
 }
 
 input,

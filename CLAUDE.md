@@ -27,6 +27,7 @@ mysql -u root -p < schema.sql
 
 # Existing DBs: apply each new migrations/*.sql once (schema.sql already includes them)
 mysql -u root -p abhidham_registration < migrations/2026-10-registration-fields.sql
+mysql -u root -p abhidham_registration < migrations/2026-10-heard-from-multi.sql
 
 # Create an admin user (feature numbers: 0=manage admins, 1=classes, 2=approvals, 3=reports,
 # 4=promotions, 6=CSV import, 7=edit student, 9=backup; 5 is unused; defaults to all 8)
@@ -123,8 +124,10 @@ block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
   student field is added in this file (plus the form, schema and a migration). Change validation
   here, not in the callers.
 - `student_form.php` — `studentChoiceField()` + `studentChoiceScript()`: renders a
-  `STUDENT_CHOICE_FIELDS` question as radios with a show-on-"อื่นๆ" text box (`index.php`,
-  `admin/students.php`).
+  `STUDENT_CHOICE_FIELDS` question as its control type (`radio`, `select`, or `multi` = a
+  `<details>` dropdown of checkboxes posted as `field[]` and stored comma-joined) with a
+  show-on-"อื่นๆ" text box, and enables `previous_student_no` only for a returning student
+  (`index.php`, `admin/students.php`).
 
 **UI conventions:** every user-facing string (captions, messages, CSV headers, emails) is Thai, and
 pages use `<html lang="th">` plus the Sarabun Google Font. All styling lives in `assets/style.css`

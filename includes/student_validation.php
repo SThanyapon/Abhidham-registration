@@ -4,17 +4,21 @@ require_once __DIR__ . '/input.php';
 
 const STUDENT_PREFIXES = ['พระ', 'สิกขมานา', 'สามเณร', 'สามเณรี', 'แม่ชี', 'นาย', 'นาง', 'นางสาว', 'อื่นๆ'];
 
-// Multiple-choice questions from the registration form: field => [label for messages, options].
-// Each ends with อื่นๆ, whose free text is stored in the matching {field}_other column.
+// The student_type answer that enables previous_student_no (returning student).
+const STUDENT_TYPE_RETURNING = 'เก่า (เคยเรียนที่วัดศรีสุดาฯ แต่ จะมาเรียนใหม่อีกรอบ)';
+
+// Separator for a 'multi' answer stored in one column (options contain no commas).
+const STUDENT_MULTI_SEPARATOR = ', ';
+
+// Multiple-choice questions from the registration form: field => [label for messages, options,
+// control]. control is 'radio', 'select' (single-choice dropdown) or 'multi' (dropdown of
+// checkboxes, stored as the picked options joined with STUDENT_MULTI_SEPARATOR). Each ends with
+// อื่นๆ, whose free text is stored in the matching {field}_other column.
 const STUDENT_CHOICE_FIELDS = [
-    'heard_from' => ['ช่องทางที่ทราบข่าว', ['เฟสบุ๊ค', 'กลุ่มไลน์', 'Tiktok (ติ๊กต๊อก)', 'เพื่อนแนะนำ', 'อื่นๆ']],
-    'student_type' => ['นักศึกษาเก่าหรือใหม่', [
-        'ใหม่ (ไม่เคยเรียนกับที่นี่)',
-        'เก่า (เคยเรียนที่วัดศรีสุดาฯ แต่ จะมาเรียนใหม่อีกรอบ)',
-        'อื่นๆ',
-    ]],
-    'zoom_skill' => ['การใช้ ZOOM', ['ใช้เป็น', 'ไม่เป็น', 'อื่นๆ']],
-    'joined_classroom' => ['การเข้าห้องเรียน', ['เข้าแล้ว', 'ยังไม่เข้า', 'อื่นๆ']],
+    'heard_from' => ['ช่องทางที่ทราบข่าว', ['เฟสบุ๊ค', 'กลุ่มไลน์', 'Tiktok (ติ๊กต๊อก)', 'เพื่อนแนะนำ', 'อื่นๆ'], 'multi'],
+    'student_type' => ['นักศึกษาเก่าหรือใหม่', ['ใหม่ (ไม่เคยเรียนกับที่นี่)', STUDENT_TYPE_RETURNING, 'อื่นๆ'], 'select'],
+    'zoom_skill' => ['การใช้ ZOOM', ['ใช้เป็น', 'ไม่เป็น', 'อื่นๆ'], 'radio'],
+    'joined_classroom' => ['การเข้าห้องเรียน', ['เข้าแล้ว', 'ยังไม่เข้า', 'อื่นๆ'], 'radio'],
 ];
 
 // The students columns validateStudentFields() produces, in table order. register.php,
@@ -44,7 +48,9 @@ const STUDENT_NULLABLE_FIELDS = [
  * they're optional but still format-checked when filled.
  *
  * A choice value that isn't one of its options is treated as อื่นๆ with that value as the free text
- * (so a CSV can carry the answer in one column).
+ * (so a CSV can carry the answer in one column); a 'multi' answer may be an array (form checkboxes)
+ * or a comma-separated string (CSV). previous_student_no is dropped unless student_type is
+ * STUDENT_TYPE_RETURNING.
  *
  * Returns [$clean, $error]: $clean holds the cleaned values (always, so a form can be refilled). When
  * valid, prefix_other / {choice}_other are null unless อื่นๆ was chosen, empty optional fields are
@@ -68,13 +74,53 @@ function validateStudentFields(array $raw, bool $requireRegistrationExtras = fal
         'study_reason' => cleanMultilineText((string) ($raw['study_reason'] ?? '')),
     ];
 
-    foreach (STUDENT_CHOICE_FIELDS as $field => [, $options]) {
-        $clean[$field] = cleanText((string) ($raw[$field] ?? ''));
+    foreach (STUDENT_CHOICE_FIELDS as $field => [, $options, $control]) {
         $clean[$field . '_other'] = cleanText((string) ($raw[$field . '_other'] ?? ''));
+
+        if ($control === 'multi') {
+            // An array from the form's checkboxes, or a comma-separated string from a CSV.
+            $items = $raw[$field] ?? [];
+            if (!is_array($items)) {
+                $items = explode(',', (string) $items);
+            }
+            $picked = [];
+            $unknown = [];
+            foreach ($items as $item) {
+                $item = cleanText((string) $item);
+                if ($item === '') {
+                    continue;
+                }
+                if (in_array($item, $options, true)) {
+                    $picked[$item] = true;
+                } else {
+                    $picked['อื่นๆ'] = true;
+                    $unknown[] = $item;
+                }
+            }
+            if ($unknown !== []) {
+                $clean[$field . '_other'] = implode(STUDENT_MULTI_SEPARATOR, array_filter(
+                    [$clean[$field . '_other'], ...$unknown],
+                    fn (string $text): bool => $text !== ''
+                ));
+            }
+            // Stored in the options' order, whatever order they were ticked in.
+            $clean[$field] = implode(STUDENT_MULTI_SEPARATOR, array_filter(
+                $options,
+                fn (string $option): bool => isset($picked[$option])
+            ));
+            continue;
+        }
+
+        $clean[$field] = cleanText((string) ($raw[$field] ?? ''));
         if ($clean[$field] !== '' && !in_array($clean[$field], $options, true)) {
             $clean[$field . '_other'] = $clean[$field];
             $clean[$field] = 'อื่นๆ';
         }
+    }
+
+    // Only a returning student has a previous ID (the form disables the box otherwise).
+    if ($clean['student_type'] !== STUDENT_TYPE_RETURNING) {
+        $clean['previous_student_no'] = '';
     }
 
     $missing = [];
@@ -110,7 +156,7 @@ function validateStudentFields(array $raw, bool $requireRegistrationExtras = fal
     foreach (STUDENT_CHOICE_FIELDS as $field => [$label]) {
         if ($clean[$field] === '' && $requireRegistrationExtras) {
             $missing[] = $label;
-        } elseif ($clean[$field] === 'อื่นๆ' && $clean[$field . '_other'] === '') {
+        } elseif (choiceIncludesOther($clean[$field]) && $clean[$field . '_other'] === '') {
             $missing[] = 'ระบุ' . $label;
         }
     }
@@ -149,7 +195,7 @@ function validateStudentFields(array $raw, bool $requireRegistrationExtras = fal
         $clean['prefix_other'] = null;
     }
     foreach (array_keys(STUDENT_CHOICE_FIELDS) as $field) {
-        if ($clean[$field] !== 'อื่นๆ') {
+        if (!choiceIncludesOther($clean[$field])) {
             $clean[$field . '_other'] = null;
         }
     }
@@ -160,6 +206,18 @@ function validateStudentFields(array $raw, bool $requireRegistrationExtras = fal
     }
 
     return [$clean, null];
+}
+
+// The options picked in a stored choice answer ('multi' answers hold several).
+function choiceValues(?string $value): array
+{
+    return ($value ?? '') === '' ? [] : explode(STUDENT_MULTI_SEPARATOR, $value);
+}
+
+// Whether a stored choice answer includes อื่นๆ (so its {field}_other text applies).
+function choiceIncludesOther(?string $value): bool
+{
+    return in_array('อื่นๆ', choiceValues($value), true);
 }
 
 /**

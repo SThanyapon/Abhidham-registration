@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/student_validation.php';
 
 /**
  * The prefix to display: the free-text prefix_other when the student chose "อื่นๆ", else prefix.
@@ -12,17 +13,21 @@ function studentPrefix(array $student): string
 }
 
 /**
- * A registration choice answer for display/CSV: the free text for อื่นๆ ("อื่นๆ: ..."), '-' when
- * unanswered. $field is a STUDENT_CHOICE_FIELDS key, read with its {field}_other from $student.
+ * A registration choice answer for display/CSV, with อื่นๆ shown as "อื่นๆ: <free text>" ('multi'
+ * answers keep their comma-separated list), '-' when unanswered. $field is a STUDENT_CHOICE_FIELDS
+ * key, read with its {field}_other from $student.
  */
 function studentChoice(array $student, string $field): string
 {
-    $value = (string) ($student[$field] ?? '');
-    if ($value === 'อื่นๆ') {
-        return 'อื่นๆ: ' . ($student[$field . '_other'] ?? '');
+    $values = choiceValues($student[$field] ?? null);
+    if ($values === []) {
+        return '-';
     }
 
-    return $value !== '' ? $value : '-';
+    return implode(STUDENT_MULTI_SEPARATOR, array_map(
+        fn (string $value): string => $value === 'อื่นๆ' ? 'อื่นๆ: ' . ($student[$field . '_other'] ?? '') : $value,
+        $values
+    ));
 }
 
 /**

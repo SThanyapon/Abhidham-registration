@@ -78,7 +78,7 @@ CREATE TABLE students (
     phone VARCHAR(50) NOT NULL,            -- mobile
     line_name VARCHAR(255),                -- LINE display name
     line_id VARCHAR(100),                  -- LINE ID or the phone number registered with LINE
-    heard_from VARCHAR(50),                -- choice; see STUDENT_CHOICE_FIELDS
+    heard_from VARCHAR(255),               -- multi-choice, options joined with ", "; see STUDENT_CHOICE_FIELDS
     heard_from_other VARCHAR(255),         -- free text when heard_from = "อื่นๆ" (same for the *_other below)
     student_type VARCHAR(100),             -- new / returning student (choice)
     student_type_other VARCHAR(255),
@@ -191,9 +191,12 @@ CREATE TABLE app_settings (
 name, LINE ID, how they heard about the course, new/returning student, previous student ID,
 referring friend, reason for studying, can they use ZOOM, have they joined the class room. The
 fields, their order and their captions mirror the course's Google Form (รุ่น 7); the four
-multiple-choice questions are radio buttons whose options live in `STUDENT_CHOICE_FIELDS`
+multiple-choice questions' options and control types live in `STUDENT_CHOICE_FIELDS`
 (`includes/student_validation.php`), each with an "อื่นๆ (ระบุ)" free-text option stored in a
-`{field}_other` column. **Required** (marked `*`, enforced client- and server-side): everything
+`{field}_other` column: ทราบข่าวจากช่องทางใด is a dropdown of checkboxes (pick one or more; stored as
+the picked options joined with ", " in option order), นักศึกษาเก่าหรือใหม่ a single-choice dropdown,
+the ZOOM and joined-classroom questions radio buttons (no fieldset frame). Previous student ID is
+enabled only when นักศึกษาเก่าหรือใหม่ is the เก่า option and is discarded server-side otherwise. **Required** (marked `*`, enforced client- and server-side): everything
 except previous student ID and referring friend — prefix (plus the free-text prefix when "อื่นๆ"),
 name-surname, age (integer 1-120), address, province, postal code (5 digits), phone (digits/spaces/
 `-`/`+`, 9-15 digits), LINE name, LINE ID, the four choices (plus their free text when "อื่นๆ"),

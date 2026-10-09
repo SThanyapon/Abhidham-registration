@@ -156,7 +156,8 @@ one can brute-force an account:
   history); disable the account instead.
 - The CSV import reads columns by position, not by header name, and always skips the first row,
   so keep the template's column order. Columns from "จังหวัด" onward are optional, so files made
-  from the older 9-column template still import.
+  from the older 9-column template still import. "ทราบข่าวจากช่องทางใด" may list several options
+  separated by commas; "รหัสนักศึกษาเดิม" is kept only when "นักศึกษาเก่าหรือใหม่" is the เก่า option.
 - Sorting Thai names/prefixes in the admin report uses MySQL's collation, which doesn't apply Thai
   leading-vowel ordering (e.g. แม่ชี sorts after สามเณร). Proper Thai sorting would need PHP's
   `intl` extension.

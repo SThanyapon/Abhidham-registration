@@ -49,7 +49,7 @@ CREATE TABLE students (
     phone VARCHAR(50) NOT NULL,
     line_name VARCHAR(255),
     line_id VARCHAR(100),
-    heard_from VARCHAR(50),
+    heard_from VARCHAR(255),
     heard_from_other VARCHAR(255),
     student_type VARCHAR(100),
     student_type_other VARCHAR(255),
