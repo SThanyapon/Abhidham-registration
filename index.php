@@ -10,6 +10,19 @@ unset($_SESSION['register_old']);
 
 $oldPrefix = $old['prefix'] ?? '';
 
+$mysqli = getDbConnection();
+$batch = $mysqli->query(
+    'SELECT id, batch_no, name FROM batches WHERE registration_open = 1 ORDER BY id DESC LIMIT 1'
+)->fetch_assoc();
+$showForm = isset($_GET['register']) || isset($_GET['error']);
+
+// While registration is open, the poster pops up on a visitor's first page view of the session
+// (never over the form or the success page).
+$showLanding = $batch && !isset($_SESSION['landing_seen']) && !$showForm && !isset($_GET['success']);
+if ($showLanding) {
+    $_SESSION['landing_seen'] = true;
+}
+
 function oldValue(array $old, string $key): string
 {
     return htmlspecialchars((string) ($old[$key] ?? ''));
@@ -41,13 +54,33 @@ function choiceField(array $old, string $field, string $caption, bool $required 
         <a class="nav-admin" href="admin/login.php">ผู้ดูแลระบบ</a>
     </nav>
 
-    <?php
-    $mysqli = getDbConnection();
-    $batch = $mysqli->query(
-        'SELECT id, batch_no, name FROM batches WHERE registration_open = 1 ORDER BY id DESC LIMIT 1'
-    )->fetch_assoc();
-    $showForm = isset($_GET['register']) || isset($_GET['error']);
-    ?>
+    <?php if ($showLanding): ?>
+        <dialog id="landing" class="landing-dialog">
+            <a href="index.php?register=1">
+                <img src="assets/images/landingpage.jpg" width="737" height="926"
+                     alt="มูลนิธิพระอภิธรรมวัดศรีสุดาราม เปิดรับสมัครนักศึกษารุ่นใหม่ ชั้นจูฬตรี พระอภิธรรมออนไลน์ เรียนฟรี ไม่มีค่าใช้จ่าย รับตำราเรียนตลอดหลักสูตร">
+            </a>
+            <div class="action-row">
+                <form class="inline-form" action="index.php" method="get">
+                    <input type="hidden" name="register" value="1">
+                    <button type="submit">ลงทะเบียนเลย</button>
+                </form>
+                <button type="button" class="secondary" onclick="this.closest('dialog').close()">ปิด</button>
+            </div>
+        </dialog>
+        <script>
+            (function () {
+                const dialog = document.getElementById('landing');
+                // A click on the backdrop lands on the dialog element itself; close on it.
+                dialog.addEventListener('click', function (e) {
+                    if (e.target === dialog) {
+                        dialog.close();
+                    }
+                });
+                dialog.showModal();
+            })();
+        </script>
+    <?php endif; ?>
 
     <?php if (isset($_GET['success'])): ?>
         <p class="success">ส่งใบลงทะเบียนเรียบร้อยแล้ว กรุณารอการอนุมัติจากเจ้าหน้าที่</p>

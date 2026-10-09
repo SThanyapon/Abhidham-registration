@@ -278,6 +278,33 @@ img.bottom-banner {
     border-radius: var(--radius);
 }
 
+/* Registration-open poster popup on a visitor's first view of index.php */
+dialog.landing-dialog {
+    padding: 0;
+    border: none;
+    border-radius: var(--radius);
+    width: min(560px, 92vw);
+    max-height: 92vh;
+    overflow: auto;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+dialog.landing-dialog::backdrop {
+    background: rgba(15, 23, 42, 0.6);
+}
+
+dialog.landing-dialog img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+dialog.landing-dialog .action-row {
+    justify-content: center;
+    padding: 12px;
+}
+
 /* Choice question (includes/student_form.php): caption, then radios / a dropdown, then the
    "อื่นๆ" text box */
 .choice-field {
