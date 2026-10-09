@@ -3,11 +3,14 @@
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/csrf.php';
 
+const ADMIN_IDLE_TIMEOUT_SECONDS = 3600;
+
 function loginAdmin(int $adminUserId): void
 {
     ensureSessionStarted();
     session_regenerate_id(true);
     $_SESSION['admin_user_id'] = $adminUserId;
+    $_SESSION['admin_last_seen'] = time();
     unset($_SESSION['otp_pending_admin_id']);
 }
 
@@ -32,6 +35,15 @@ function requireAdminLogin(): int
         header('Location: login.php');
         exit;
     }
+
+    // An admin session left idle too long must log in (and pass OTP) again.
+    $lastSeen = $_SESSION['admin_last_seen'] ?? time();
+    if (time() - $lastSeen > ADMIN_IDLE_TIMEOUT_SECONDS) {
+        logoutAdmin();
+        header('Location: login.php');
+        exit;
+    }
+    $_SESSION['admin_last_seen'] = time();
 
     // An account disabled or deleted (admin/admins.php) loses access on its next request, not just at
     // its next login.

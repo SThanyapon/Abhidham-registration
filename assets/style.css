@@ -137,7 +137,7 @@ nav a:hover {
 
 /* Pushed to the right end of the nav, apart from the regular links */
 nav a.nav-admin,
-nav a.nav-logout {
+nav form.nav-logout {
     margin-left: auto;
 }
 
@@ -151,11 +151,29 @@ nav a.nav-admin:hover {
     color: #fff;
 }
 
-nav a.nav-logout {
-    color: var(--danger);
+/* Logout is a POST form (CSRF-protected) whose button looks like the nav links */
+nav form.nav-logout {
+    display: block;
+    padding: 0;
+    margin-bottom: 0;
+    background: none;
+    box-shadow: none;
+    border-radius: 0;
 }
 
-nav a.nav-logout:hover {
+nav form.nav-logout button {
+    padding: 6px 16px;
+    border-radius: 999px;
+    background: none;
+    box-shadow: none;
+    color: var(--danger);
+    font-size: 0.95rem;
+    transition: background 0.15s, color 0.15s;
+}
+
+nav form.nav-logout button:hover {
+    transform: none;
+    filter: none;
     background: #fee2e2;
     color: var(--danger-dark);
 }

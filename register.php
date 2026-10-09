@@ -12,22 +12,23 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 verifyCsrf();
 
+// Redirects back to the form with an error, keeping what the user typed (both read once by index.php).
+// The message travels in the session, not the URL, so nobody can link to the site showing their own text.
+function failRegistration(string $message, array $old = []): void
+{
+    $_SESSION['register_old'] = $old;
+    $_SESSION['register_error'] = $message;
+    header('Location: index.php?register=1');
+    exit;
+}
+
 $ip = getClientIp();
 
 if (!checkRateLimit('register', $ip)) {
-    header('Location: index.php?error=' . urlencode('มีการลองหลายครั้งเกินไป กรุณาลองใหม่ภายหลัง'));
-    exit;
+    failRegistration('มีการลองหลายครั้งเกินไป กรุณาลองใหม่ภายหลัง');
 }
 
 recordRateLimitHit('register', $ip);
-
-// Redirects back to the form with an error, keeping what the user typed (read once by index.php).
-function failRegistration(string $message, array $old): void
-{
-    $_SESSION['register_old'] = $old;
-    header('Location: index.php?error=' . urlencode($message));
-    exit;
-}
 
 [$student, $validationError] = validateStudentFields($_POST, true);
 
@@ -42,8 +43,7 @@ $batch = $mysqli->query(
 )->fetch_assoc();
 
 if (!$batch) {
-    header('Location: index.php?error=' . urlencode('ขณะนี้ปิดรับลงทะเบียน'));
-    exit;
+    failRegistration('ขณะนี้ปิดรับลงทะเบียน', $student);
 }
 
 [$types, $values] = studentDetailParams($student);

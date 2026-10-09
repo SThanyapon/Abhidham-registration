@@ -6,7 +6,8 @@ require_once __DIR__ . '/includes/student_form.php';
 // Values from a failed submission (set by register.php), shown once to refill the form.
 ensureSessionStarted();
 $old = $_SESSION['register_old'] ?? [];
-unset($_SESSION['register_old']);
+$registerError = $_SESSION['register_error'] ?? null;
+unset($_SESSION['register_old'], $_SESSION['register_error']);
 
 $oldPrefix = $old['prefix'] ?? '';
 
@@ -14,7 +15,7 @@ $mysqli = getDbConnection();
 $batch = $mysqli->query(
     'SELECT id, batch_no, name FROM batches WHERE registration_open = 1 ORDER BY id DESC LIMIT 1'
 )->fetch_assoc();
-$showForm = isset($_GET['register']) || isset($_GET['error']);
+$showForm = isset($_GET['register']) || $registerError !== null;
 
 // While registration is open, the poster pops up on a visitor's first page view of the session
 // (never over the form or the success page).
@@ -92,8 +93,8 @@ function choiceField(array $old, string $field, string $caption, bool $required 
              alt="มูลนิธิพระอภิธรรมวัดศรีสุดาราม สำนักงานเลขที่ 83 วัดศรีสุดารามวรวิหาร โทร. 086 750 8338">
     <?php endif; ?>
 
-    <?php if (isset($_GET['error'])): ?>
-        <p class="error"><?= htmlspecialchars($_GET['error']) ?></p>
+    <?php if ($registerError !== null): ?>
+        <p class="error"><?= htmlspecialchars($registerError) ?></p>
     <?php endif; ?>
 
     <?php if (!$showForm): ?>

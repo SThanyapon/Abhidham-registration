@@ -49,3 +49,18 @@ function cleanCode(string $value): string
 
     return $cleaned ?? trim($value);
 }
+
+/**
+ * CSV export rows: a cell starting with = + - @ (or tab/CR) is run as a formula by Excel, so applicant
+ * free text such as =HYPERLINK(...) is prefixed with ' to keep it plain text. Numbers and the lone '-'
+ * placeholder pass unchanged.
+ */
+function csvSafe(array $row): array
+{
+    return array_map(static function ($value) {
+        if (is_string($value) && strlen($value) > 1 && strpbrk($value[0], "=+-@\t\r") !== false) {
+            return "'" . $value;
+        }
+        return $value;
+    }, $row);
+}

@@ -39,7 +39,12 @@ function sendEmail(string $to, string $subject, string $body, array $attachments
     if ($config['encryption'] === 'tls') {
         $write('STARTTLS');
         $read();
-        stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
+        // Never fall through to AUTH over an unencrypted connection.
+        if (stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT) !== true) {
+            error_log('SMTP STARTTLS failed; not sending credentials');
+            fclose($socket);
+            return false;
+        }
         $write('EHLO localhost');
         $read();
     }

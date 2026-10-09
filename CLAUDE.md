@@ -65,10 +65,11 @@ block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
 - `auth.php` — admin session management (`loginAdmin`/`logoutAdmin`/`currentAdminId`) and **per-feature**
   authorization: `requireAdminLogin()` gates on being logged in and on the account still existing with
   `is_active = 1` (so disabling/deleting an admin in `admin/admins.php` ends their session on the next
-  request), and `requireFeature($adminId, $n)` gates on the numbered feature (0-4, 6, 7, 9) via the
+  request) and on not being idle longer than `ADMIN_IDLE_TIMEOUT_SECONDS` (1 hour), and `requireFeature($adminId, $n)` gates on the numbered feature (0-4, 6, 7, 9) via the
   `admin_permissions` table. Every admin page calls both.
 - `csrf.php` — `csrfToken()`/`csrfField()`/`verifyCsrf()`. Every POST handler calls `verifyCsrf()`
-  first; every form includes `<?= csrfField() ?>`.
+  first; every form includes `<?= csrfField() ?>`. Also home of `ensureSessionStarted()`, which sets
+  the session cookie to HttpOnly + SameSite=Lax (+ Secure over HTTPS) with strict mode.
 - `rate_limit.php` — sliding-window limiter (`checkRateLimit($formKey, $identifier)` +
   `recordRateLimitHit`) backed by the `rate_limit_hits` table, thresholds read from
   `config.local.php['rate_limit']`. Applied to register, check-in, and lookup by `form_key`, keyed by
@@ -112,7 +113,8 @@ block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
   `cleanCode()` (strip all whitespace, for student IDs and OTP codes), and `isValidPersonName()`
   (registration name whitelist: Thai/English letters, digits, spaces, dashes). This matters for correctness,
   not just tidiness: check-in and lookup match `full_name` by exact equality. Passwords are never
-  cleaned.
+  cleaned. `csvSafe()` neutralises spreadsheet formulas (leading `= + - @`) in CSV export rows; wrap
+  every `fputcsv` data row that can hold user-entered text.
 - `student_validation.php` — `validateStudentFields($raw, $requireRegistrationExtras = false)`:
   cleans and validates the registration-form fields (prefix whitelist `STUDENT_PREFIXES`, the
   radio-button questions in `STUDENT_CHOICE_FIELDS` with their `{field}_other` free text, required
@@ -142,9 +144,11 @@ headers), `.view-toggle` (pill switch between views), `.field-group`, `button.da
 `button.secondary`, `.feature-links` (the dashboard's two-column card grid, one column under
 480px), and the nav classes
 `.nav-admin` (public pages' ผู้ดูแลระบบ link, right-aligned, orange) and `.nav-logout` (admin
-pages' ออกจากระบบ link, right-aligned, red). Validate on the server even when the form has
+pages' ออกจากระบบ, a POST form with a CSRF token styled as a right-aligned red link; `logout.php`
+ignores GET). Validate on the server even when the form has
 `required`/`pattern` attributes; `register.php` redirects back with the entered values in
-`$_SESSION['register_old']` so the form can be refilled.
+`$_SESSION['register_old']` and the message in `$_SESSION['register_error']` (never in the URL, so
+nobody can craft a link showing their own text) so the form can be refilled.
 
 **`cron/backup.php`** is the CLI entry point for scheduled backups (Windows Task Scheduler or cron),
 calling `includes/backup.php`'s `runBackup('scheduled')`.

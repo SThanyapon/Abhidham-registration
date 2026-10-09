@@ -5,6 +5,7 @@ require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/attendance.php';
 require_once __DIR__ . '/../includes/date_helpers.php';
 require_once __DIR__ . '/../includes/student_helpers.php';
+require_once __DIR__ . '/../includes/input.php';
 
 $adminId = requireAdminLogin();
 requireFeature($adminId, 3);
@@ -219,7 +220,7 @@ if ($exportCsv) {
     if ($view === 'rejected') {
         fputcsv($out, array_values($sortColumns));
         foreach ($rejected as $r) {
-            fputcsv($out, [
+            fputcsv($out, csvSafe([
                 studentPrefix($r),
                 $r['full_name'],
                 batchLabel($r),
@@ -237,32 +238,32 @@ if ($exportCsv) {
                 studentChoice($r, 'zoom_skill'),
                 studentChoice($r, 'joined_classroom'),
                 substr((string) $r['created_at'], 0, 10),
-            ]);
+            ]));
         }
     } elseif ($selectedStudent) {
         fputcsv($out, ['รหัสนักศึกษา', 'คำนำหน้า', 'ชื่อ-นามสกุล', 'รุ่น', 'ระดับชั้น']);
-        fputcsv($out, [
+        fputcsv($out, csvSafe([
             $selectedStudent['student_no'] ?? '-',
             studentPrefix($selectedStudent),
             $selectedStudent['full_name'],
             batchLabel($selectedStudent),
             $selectedStudent['level_name'],
-        ]);
+        ]));
         fputcsv($out, []);
         fputcsv($out, ['ครั้งที่', 'วันที่เรียน', 'ลงชื่อเข้าเรียน']);
         foreach (($singleReport['sessions'] ?? []) as $session) {
-            fputcsv($out, [
+            fputcsv($out, csvSafe([
                 $session['session_number'],
                 $session['session_date'],
                 $session['checked_in'] ? 'ใช่' : 'ไม่ใช่',
-            ]);
+            ]));
         }
     } else {
         fputcsv($out, ['รหัสนักศึกษา', 'คำนำหน้า', 'ชื่อ-นามสกุล', 'รุ่น', 'ระดับชั้น', 'เข้าเรียน (ครั้ง)', 'จัดสอนแล้ว (ครั้ง)', 'ร้อยละ']);
         foreach ($allReports as $row) {
             $s = $row['student'];
             $summary = $row['summary'];
-            fputcsv($out, [
+            fputcsv($out, csvSafe([
                 $s['student_no'] ?? '-',
                 studentPrefix($s),
                 $s['full_name'],
@@ -271,7 +272,7 @@ if ($exportCsv) {
                 $summary['completed_count'] ?? '-',
                 $summary['conducted_count'] ?? '-',
                 $summary !== null ? $summary['percent'] . '%' : '-',
-            ]);
+            ]));
         }
     }
 
@@ -298,7 +299,7 @@ $exportHref = 'reports.php?export=csv&view=' . $view . '&sort=' . urlencode($sor
     <h1>รายงานการเข้าเรียน</h1>
     <nav>
         <a href="dashboard.php">กลับหน้าแผงควบคุม</a>
-        <a class="nav-logout" href="logout.php">ออกจากระบบ</a>
+        <form class="nav-logout" action="logout.php" method="post"><?= csrfField() ?><button type="submit">ออกจากระบบ</button></form>
     </nav>
 
     <div class="view-toggle">

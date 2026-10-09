@@ -10,6 +10,13 @@ function generateAndSendOtp(int $adminUserId, string $email): bool
     $ttlSeconds = getConfig()['otp']['ttl_seconds'];
 
     $mysqli = getDbConnection();
+
+    // Only the newest code is valid, so repeated logins don't leave several guessable codes alive.
+    $retire = $mysqli->prepare('UPDATE otp_codes SET consumed = 1 WHERE admin_user_id = ? AND consumed = 0');
+    $retire->bind_param('i', $adminUserId);
+    $retire->execute();
+    $retire->close();
+
     $stmt = $mysqli->prepare(
         'INSERT INTO otp_codes (admin_user_id, code_hash, expires_at)
          VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? SECOND))'

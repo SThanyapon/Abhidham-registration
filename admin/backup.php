@@ -66,7 +66,7 @@ $triggerLabels = ['manual' => 'ด้วยตนเอง', 'scheduled' => 'ต
     <h1>สำรองฐานข้อมูล</h1>
     <nav>
         <a href="dashboard.php">กลับหน้าแผงควบคุม</a>
-        <a class="nav-logout" href="logout.php">ออกจากระบบ</a>
+        <form class="nav-logout" action="logout.php" method="post"><?= csrfField() ?><button type="submit">ออกจากระบบ</button></form>
     </nav>
 
     <?php if ($notice): ?><p class="success"><?= htmlspecialchars($notice) ?></p><?php endif; ?>

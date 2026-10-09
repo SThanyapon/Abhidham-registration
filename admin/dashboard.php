@@ -26,7 +26,7 @@ $stmt->close();
 <body class="admin">
     <h1>แผงควบคุมสำหรับผู้ดูแลระบบ</h1>
     <nav>
-        <a class="nav-logout" href="logout.php">ออกจากระบบ</a>
+        <form class="nav-logout" action="logout.php" method="post"><?= csrfField() ?><button type="submit">ออกจากระบบ</button></form>
     </nav>
 
     <div class="card feature-links">

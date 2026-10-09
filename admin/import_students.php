@@ -246,7 +246,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <h1>นำเข้ารายชื่อนักศึกษา (CSV)</h1>
     <nav>
         <a href="dashboard.php">กลับหน้าแผงควบคุม</a>
-        <a class="nav-logout" href="logout.php">ออกจากระบบ</a>
+        <form class="nav-logout" action="logout.php" method="post"><?= csrfField() ?><button type="submit">ออกจากระบบ</button></form>
     </nav>
 
     <?php if ($error): ?><p class="error"><?= htmlspecialchars($error) ?></p><?php endif; ?>

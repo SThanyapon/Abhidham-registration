@@ -3,6 +3,14 @@
 function ensureSessionStarted(): void
 {
     if (session_status() === PHP_SESSION_NONE) {
+        // Cookie unreadable by JavaScript, not sent on cross-site POSTs, HTTPS-only when served over
+        // HTTPS (plain http stays usable for `php -S` local dev); unknown session IDs are rejected.
+        ini_set('session.use_strict_mode', '1');
+        session_set_cookie_params([
+            'httponly' => true,
+            'samesite' => 'Lax',
+            'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        ]);
         session_start();
     }
 }
