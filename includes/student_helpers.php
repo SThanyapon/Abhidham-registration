@@ -12,6 +12,20 @@ function studentPrefix(array $student): string
 }
 
 /**
+ * A registration choice answer for display/CSV: the free text for อื่นๆ ("อื่นๆ: ..."), '-' when
+ * unanswered. $field is a STUDENT_CHOICE_FIELDS key, read with its {field}_other from $student.
+ */
+function studentChoice(array $student, string $field): string
+{
+    $value = (string) ($student[$field] ?? '');
+    if ($value === 'อื่นๆ') {
+        return 'อื่นๆ: ' . ($student[$field . '_other'] ?? '');
+    }
+
+    return $value !== '' ? $value : '-';
+}
+
+/**
  * The class instance for the student's batch + current level, or null if that class hasn't been
  * created yet.
  */

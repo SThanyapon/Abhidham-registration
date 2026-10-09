@@ -2,7 +2,7 @@
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/auth.php';
-require_once __DIR__ . '/../includes/student_validation.php';
+require_once __DIR__ . '/../includes/student_form.php';
 
 $adminId = requireAdminLogin();
 requireFeature($adminId, 7);
@@ -70,23 +70,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $student = array_merge($student, $clean);
             } else {
                 // student_no, batch, level and status are deliberately not editable here.
+                [$types, $values] = studentDetailParams($clean);
+                $values[] = $studentId;
                 $update = $mysqli->prepare(
-                    'UPDATE students SET prefix = ?, prefix_other = ?, full_name = ?, age = ?, address = ?,
-                                         phone = ?, line_id = ?, reference_person = ?
-                     WHERE id = ?'
+                    'UPDATE students SET ' . implode(' = ?, ', STUDENT_DETAIL_COLUMNS) . ' = ? WHERE id = ?'
                 );
-                $update->bind_param(
-                    'sssissssi',
-                    $clean['prefix'],
-                    $clean['prefix_other'],
-                    $clean['full_name'],
-                    $clean['age'],
-                    $clean['address'],
-                    $clean['phone'],
-                    $clean['line_id'],
-                    $clean['reference_person'],
-                    $studentId
-                );
+                $update->bind_param($types . 'i', ...$values);
                 $update->execute();
                 $update->close();
 
@@ -98,6 +87,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $prefix = $student['prefix'] ?? '';
+
+// Optional here: students imported or registered before these questions existed have no answer.
+function adminChoiceField(array $student, string $field, string $caption): string
+{
+    return studentChoiceField($field, $caption, (string) ($student[$field] ?? ''), (string) ($student[$field . '_other'] ?? ''), false);
+}
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -164,7 +159,7 @@ $prefix = $student['prefix'] ?? '';
                        <?= $prefix === 'อื่นๆ' ? 'required' : '' ?>>
             </div>
 
-            <label for="full_name">ชื่อ-นามสกุล<span class="required-mark">*</span></label>
+            <label for="full_name">ชื่อ-สกุล (ภาษาไทย)<span class="required-mark">*</span></label>
             <input type="text" id="full_name" name="full_name" required
                    value="<?= htmlspecialchars($student['full_name']) ?>"
                    pattern="[ก-ฺเ-๎๐-๙A-Za-z0-9 \-‐-–]+"
@@ -174,24 +169,54 @@ $prefix = $student['prefix'] ?? '';
             <input type="number" id="age" name="age" min="1" max="120" required
                    value="<?= htmlspecialchars((string) ($student['age'] ?? '')) ?>">
 
-            <label for="address">ที่อยู่<span class="required-mark">*</span></label>
+            <label for="address">ที่อยู่ในการส่งเอกสาร<span class="required-mark">*</span></label>
             <textarea id="address" name="address" rows="3" required><?= htmlspecialchars((string) ($student['address'] ?? '')) ?></textarea>
 
-            <label for="phone">เบอร์โทรศัพท์<span class="required-mark">*</span></label>
+            <label for="province">จังหวัด</label>
+            <input type="text" id="province" name="province"
+                   value="<?= htmlspecialchars((string) ($student['province'] ?? '')) ?>">
+
+            <label for="postal_code">รหัสไปรษณีย์</label>
+            <input type="text" id="postal_code" name="postal_code" inputmode="numeric"
+                   pattern="[0-9]{5}" maxlength="5" title="ตัวเลข 5 หลัก"
+                   value="<?= htmlspecialchars((string) ($student['postal_code'] ?? '')) ?>">
+
+            <label for="phone">เบอร์มือถือ<span class="required-mark">*</span></label>
             <input type="tel" id="phone" name="phone" inputmode="tel" required
                    pattern="\+?[0-9 \-]{9,20}" title="ตัวเลข 9-15 หลัก เช่น 081 234 5678"
                    value="<?= htmlspecialchars($student['phone']) ?>">
 
-            <label for="line_id">Line ID</label>
+            <label for="line_name">ชื่อไลน์</label>
+            <input type="text" id="line_name" name="line_name"
+                   value="<?= htmlspecialchars((string) ($student['line_name'] ?? '')) ?>">
+
+            <label for="line_id">LINE ID หรือ เบอร์มือถือที่ลงทะเบียนไว้กับ LINE</label>
             <input type="text" id="line_id" name="line_id" value="<?= htmlspecialchars((string) ($student['line_id'] ?? '')) ?>">
 
-            <label for="reference_person">ผู้แนะนำ</label>
+            <?= adminChoiceField($student, 'heard_from', 'ทราบข่าวการสมัครจากช่องทางใด') ?>
+
+            <?= adminChoiceField($student, 'student_type', 'นักศึกษาเก่าหรือใหม่') ?>
+
+            <label for="previous_student_no">รหัสนักศึกษาเดิม</label>
+            <input type="text" id="previous_student_no" name="previous_student_no" inputmode="numeric"
+                   pattern="[0-9]{4,10}" title="ตัวเลข 4-10 หลัก"
+                   value="<?= htmlspecialchars((string) ($student['previous_student_no'] ?? '')) ?>">
+
+            <label for="reference_person">เพื่อนที่แนะนำมา (ชื่อนามสกุล เบอร์โทร)</label>
             <input type="text" id="reference_person" name="reference_person"
                    value="<?= htmlspecialchars((string) ($student['reference_person'] ?? '')) ?>">
+
+            <label for="study_reason">เหตุผลที่มาเรียนพระอภิธรรม</label>
+            <textarea id="study_reason" name="study_reason" rows="3"><?= htmlspecialchars((string) ($student['study_reason'] ?? '')) ?></textarea>
+
+            <?= adminChoiceField($student, 'zoom_skill', 'ใช้ ZOOM เป็นหรือไม่') ?>
+
+            <?= adminChoiceField($student, 'joined_classroom', 'ได้กดเข้าห้องเรียนแล้วหรือยัง') ?>
 
             <button type="submit">บันทึกการแก้ไข</button>
         </form>
 
+        <?= studentChoiceScript() ?>
         <script>
             function togglePrefixOther() {
                 const isOther = document.getElementById('prefix').value === 'อื่นๆ';

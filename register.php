@@ -29,7 +29,7 @@ function failRegistration(string $message, array $old): void
     exit;
 }
 
-[$student, $validationError] = validateStudentFields($_POST);
+[$student, $validationError] = validateStudentFields($_POST, true);
 
 if ($validationError !== null) {
     failRegistration($validationError, $student);
@@ -46,22 +46,13 @@ if (!$batch) {
     exit;
 }
 
+[$types, $values] = studentDetailParams($student);
 $stmt = $mysqli->prepare(
-    'INSERT INTO students (prefix, prefix_other, full_name, age, address, phone, line_id, reference_person, batch_id, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, "pending")'
+    'INSERT INTO students (' . implode(', ', STUDENT_DETAIL_COLUMNS) . ', batch_id, status)
+     VALUES (' . str_repeat('?, ', count(STUDENT_DETAIL_COLUMNS)) . '?, "pending")'
 );
-$stmt->bind_param(
-    'sssissssi',
-    $student['prefix'],
-    $student['prefix_other'],
-    $student['full_name'],
-    $student['age'],
-    $student['address'],
-    $student['phone'],
-    $student['line_id'],
-    $student['reference_person'],
-    $batch['id']
-);
+$values[] = $batch['id'];
+$stmt->bind_param($types . 'i', ...$values);
 $stmt->execute();
 $stmt->close();
 

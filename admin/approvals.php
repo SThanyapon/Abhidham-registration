@@ -64,8 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $pending = $mysqli->query(
-    "SELECT s.id, s.prefix, s.prefix_other, s.full_name, s.age, s.phone, s.line_id, s.reference_person,
-            b.batch_no, b.name AS batch_name
+    "SELECT s.*, b.batch_no, b.name AS batch_name
      FROM students s
      JOIN batches b ON b.id = s.batch_id
      WHERE s.status = 'pending'
@@ -105,10 +104,26 @@ $pending = $mysqli->query(
             </p>
             <p>
                 อายุ: <?= htmlspecialchars((string) ($student['age'] ?? '-')) ?> |
-                หมายเลขโทรศัพท์: <?= htmlspecialchars($student['phone']) ?> |
-                ไอดีไลน์: <?= htmlspecialchars($student['line_id'] ?? '-') ?> |
-                ผู้แนะนำ: <?= htmlspecialchars($student['reference_person'] ?? '-') ?>
+                เบอร์มือถือ: <?= htmlspecialchars($student['phone']) ?> |
+                ชื่อไลน์: <?= htmlspecialchars($student['line_name'] ?: '-') ?> |
+                LINE ID: <?= htmlspecialchars($student['line_id'] ?: '-') ?>
             </p>
+            <p>
+                ที่อยู่: <?= htmlspecialchars(trim(($student['address'] ?? '') . ' ' . ($student['province'] ?? '') . ' ' . ($student['postal_code'] ?? '')) ?: '-') ?>
+            </p>
+            <p>
+                ทราบข่าวจาก: <?= htmlspecialchars(studentChoice($student, 'heard_from')) ?> |
+                นักศึกษา: <?= htmlspecialchars(studentChoice($student, 'student_type')) ?>
+                <?php if ($student['previous_student_no']): ?>
+                    (รหัสเดิม <?= htmlspecialchars($student['previous_student_no']) ?>)
+                <?php endif; ?> |
+                เพื่อนที่แนะนำ: <?= htmlspecialchars($student['reference_person'] ?: '-') ?>
+            </p>
+            <p>
+                ใช้ ZOOM: <?= htmlspecialchars(studentChoice($student, 'zoom_skill')) ?> |
+                เข้าห้องเรียน: <?= htmlspecialchars(studentChoice($student, 'joined_classroom')) ?>
+            </p>
+            <p>เหตุผลที่มาเรียน: <?= nl2br(htmlspecialchars($student['study_reason'] ?: '-')) ?></p>
 
             <div class="action-row">
                 <form action="approvals.php" method="post" class="inline-form">

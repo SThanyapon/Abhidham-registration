@@ -25,6 +25,9 @@ php -S localhost:8000
 # Apply/reset schema (creates DB abhidham_registration, seeds the 9 class levels)
 mysql -u root -p < schema.sql
 
+# Existing DBs: apply each new migrations/*.sql once (schema.sql already includes them)
+mysql -u root -p abhidham_registration < migrations/2026-10-registration-fields.sql
+
 # Create an admin user (feature numbers: 0=manage admins, 1=classes, 2=approvals, 3=reports,
 # 4=promotions, 6=CSV import, 7=edit student, 9=backup; 5 is unused; defaults to all 8)
 php scripts/create_admin.php <username> <email> <password> [0,1,2,3,4,6,7,9]
@@ -109,10 +112,19 @@ block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
   (registration name whitelist: Thai/English letters, digits, spaces, dashes). This matters for correctness,
   not just tidiness: check-in and lookup match `full_name` by exact equality. Passwords are never
   cleaned.
-- `student_validation.php` — `validateStudentFields()`: cleans and validates the registration-form
-  fields (prefix whitelist `STUDENT_PREFIXES`, required fields, name/age/phone rules) and returns
-  `[$clean, $error]`. Shared by `register.php`, `admin/import_students.php` and `admin/students.php`
-  so all three enforce identical rules. Change validation here, not in the callers.
+- `student_validation.php` — `validateStudentFields($raw, $requireRegistrationExtras = false)`:
+  cleans and validates the registration-form fields (prefix whitelist `STUDENT_PREFIXES`, the
+  radio-button questions in `STUDENT_CHOICE_FIELDS` with their `{field}_other` free text, required
+  fields, name/age/phone/postal-code rules) and returns `[$clean, $error]`. Shared by `register.php`,
+  `admin/import_students.php` and `admin/students.php` so all three enforce identical rules; only
+  `register.php` passes `true`, which makes the Google-Form fields (province, postal code, LINE
+  name/ID, choices, study reason) mandatory — older/imported students lack them. The three callers
+  build their INSERT/UPDATE from `STUDENT_DETAIL_COLUMNS` + `studentDetailParams()`, so a new
+  student field is added in this file (plus the form, schema and a migration). Change validation
+  here, not in the callers.
+- `student_form.php` — `studentChoiceField()` + `studentChoiceScript()`: renders a
+  `STUDENT_CHOICE_FIELDS` question as radios with a show-on-"อื่นๆ" text box (`index.php`,
+  `admin/students.php`).
 
 **UI conventions:** every user-facing string (captions, messages, CSV headers, emails) is Thai, and
 pages use `<html lang="th">` plus the Sarabun Google Font. All styling lives in `assets/style.css`

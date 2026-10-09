@@ -18,6 +18,13 @@ $targets = [
     ['students', 'line_id', 'cleanText'],
     ['students', 'reference_person', 'cleanText'],
     ['students', 'address', 'cleanMultilineText'],
+    ['students', 'province', 'cleanText'],
+    ['students', 'line_name', 'cleanText'],
+    ['students', 'heard_from_other', 'cleanText'],
+    ['students', 'student_type_other', 'cleanText'],
+    ['students', 'zoom_skill_other', 'cleanText'],
+    ['students', 'joined_classroom_other', 'cleanText'],
+    ['students', 'study_reason', 'cleanMultilineText'],
     ['batches', 'name', 'cleanText'],
 ];
 

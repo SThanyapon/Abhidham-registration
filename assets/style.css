@@ -259,6 +259,44 @@ label {
     margin-right: 12px;
 }
 
+/* Post-registration classroom QR code (index.php?success=1) and the footer banner below it */
+.classroom-qr {
+    text-align: center;
+}
+
+.classroom-qr img {
+    max-width: 100%;
+    height: auto;
+}
+
+img.bottom-banner {
+    display: block;
+    width: 100%;
+    max-width: 740px;
+    height: auto;
+    margin: 0 auto 24px;
+    border-radius: var(--radius);
+}
+
+/* Radio-button question (legend + one option per line + optional "อื่นๆ" text box) */
+fieldset.choice-group {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+fieldset.choice-group legend {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text);
+    padding: 0;
+    margin-bottom: 6px;
+}
+
 input,
 textarea,
 select {

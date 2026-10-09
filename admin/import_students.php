@@ -9,6 +9,8 @@ $adminId = requireAdminLogin();
 requireFeature($adminId, 6);
 
 // CSV column order; the import reads columns by position, so this is also the template header.
+// The columns after reference_person were added later and are optional, so older 9-column files
+// still import. A choice column holds one of its STUDENT_CHOICE_FIELDS options or free text (= อื่นๆ).
 const IMPORT_COLUMNS = [
     'student_no' => 'รหัสนักศึกษา',
     'prefix' => 'คำนำหน้า',
@@ -19,6 +21,15 @@ const IMPORT_COLUMNS = [
     'phone' => 'เบอร์โทรศัพท์',
     'line_id' => 'Line ID',
     'reference_person' => 'ผู้แนะนำ',
+    'province' => 'จังหวัด',
+    'postal_code' => 'รหัสไปรษณีย์',
+    'line_name' => 'ชื่อไลน์',
+    'heard_from' => 'ทราบข่าวจากช่องทางใด',
+    'student_type' => 'นักศึกษาเก่าหรือใหม่',
+    'previous_student_no' => 'รหัสนักศึกษาเดิม',
+    'study_reason' => 'เหตุผลที่มาเรียน',
+    'zoom_skill' => 'ใช้ ZOOM เป็นหรือไม่',
+    'joined_classroom' => 'เข้าห้องเรียนแล้วหรือยัง',
 ];
 const IMPORT_MAX_BYTES = 2 * 1024 * 1024;
 
@@ -139,9 +150,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             "SELECT 1 FROM students WHERE full_name = ? AND status IN ('approved', 'pending')"
         );
         $insert = $mysqli->prepare(
-            'INSERT INTO students (student_no, prefix, prefix_other, full_name, age, address, phone, line_id,
-                                   reference_person, batch_id, current_class_level_id, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "approved")'
+            'INSERT INTO students (student_no, ' . implode(', ', STUDENT_DETAIL_COLUMNS) . ',
+                                   batch_id, current_class_level_id, status)
+             VALUES (?, ' . str_repeat('?, ', count(STUDENT_DETAIL_COLUMNS)) . '?, ?, "approved")'
         );
 
         while (($cells = fgetcsv($stream, 0, ',', '"', '')) !== false) {
@@ -197,20 +208,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $batchId = $batchIds[(int) substr($studentNo, 0, -3)];
 
             try {
-                $insert->bind_param(
-                    'ssssissssii',
-                    $studentNo,
-                    $student['prefix'],
-                    $student['prefix_other'],
-                    $student['full_name'],
-                    $student['age'],
-                    $student['address'],
-                    $student['phone'],
-                    $student['line_id'],
-                    $student['reference_person'],
-                    $batchId,
-                    $selectedLevelId
-                );
+                [$types, $values] = studentDetailParams($student);
+                $params = [$studentNo, ...$values, $batchId, $selectedLevelId];
+                $insert->bind_param('s' . $types . 'ii', ...$params);
                 $insert->execute();
             } catch (mysqli_sql_exception $e) {
                 $skipped[] = "แถว $rowNumber: บันทึกไม่สำเร็จ (รหัสนักศึกษา $studentNo อาจมีผู้ใช้แล้ว)";
@@ -268,6 +268,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
            กรุณาสร้างรุ่นในหน้าการจัดการชั้นเรียนก่อน</p>
         <p>ไฟล์ต้องมีแถวหัวตารางในแถวแรก และเรียงคอลัมน์ดังนี้:
            <?= htmlspecialchars(implode(', ', IMPORT_COLUMNS)) ?></p>
+        <p class="form-note">คอลัมน์ตั้งแต่ "จังหวัด" เป็นต้นไปไม่บังคับ (ไฟล์แบบเดิมที่มีถึงคอลัมน์ "ผู้แนะนำ" ยังนำเข้าได้)
+           คอลัมน์ที่เป็นตัวเลือก ให้ใส่ข้อความตามตัวเลือกในแบบฟอร์มลงทะเบียน หรือข้อความอื่น (บันทึกเป็น "อื่นๆ")</p>
         <p><a href="import_students.php?template=1">ดาวน์โหลดไฟล์ตัวอย่าง (CSV)</a></p>
     </div>
 

@@ -68,14 +68,29 @@ CREATE TABLE sessions (
 CREATE TABLE students (
     id INT AUTO_INCREMENT PRIMARY KEY,
     student_no VARCHAR(10) UNIQUE,         -- NULL until approved; see section 5 for format
-    prefix VARCHAR(50) NOT NULL,           -- พระ, สิกขามานา, สามเณร, สามเณรี, แม่ชี, นาย, นาง, นางสาว, อื่นๆ
+    prefix VARCHAR(50) NOT NULL,           -- พระ, สิกขมานา, สามเณร, สามเณรี, แม่ชี, นาย, นาง, นางสาว, อื่นๆ
     prefix_other VARCHAR(100),             -- free text when prefix = "อื่นๆ"
     full_name VARCHAR(255) NOT NULL,       -- Name-Surname (Thai)
     age INT,
-    address TEXT,
-    phone VARCHAR(50) NOT NULL,
-    line_id VARCHAR(100),
-    reference_person VARCHAR(255),
+    address TEXT,                          -- mailing address, excluding province / postal code
+    province VARCHAR(100),
+    postal_code VARCHAR(5),
+    phone VARCHAR(50) NOT NULL,            -- mobile
+    line_name VARCHAR(255),                -- LINE display name
+    line_id VARCHAR(100),                  -- LINE ID or the phone number registered with LINE
+    heard_from VARCHAR(50),                -- choice; see STUDENT_CHOICE_FIELDS
+    heard_from_other VARCHAR(255),         -- free text when heard_from = "อื่นๆ" (same for the *_other below)
+    student_type VARCHAR(100),             -- new / returning student (choice)
+    student_type_other VARCHAR(255),
+    previous_student_no VARCHAR(20),       -- returning students' old ID, optional
+    reference_person VARCHAR(255),         -- referring friend: name + phone
+    study_reason TEXT,
+    zoom_skill VARCHAR(50),                -- can use ZOOM? (choice)
+    zoom_skill_other VARCHAR(255),
+    joined_classroom VARCHAR(50),          -- already joined the class room? (choice)
+    joined_classroom_other VARCHAR(255),
+    -- province .. joined_classroom_other were added by migrations/2026-10-registration-fields.sql
+    -- and are NULL for students registered/imported before then.
     batch_id INT NOT NULL REFERENCES batches(id),
     current_class_level_id INT REFERENCES class_levels(id),
     status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
@@ -172,12 +187,21 @@ CREATE TABLE app_settings (
 `index.php` is a landing page — the form is not shown until the visitor clicks "ลงทะเบียน"
 (`?register=1`), so a first-time visit doesn't drop straight into a form. Fields: prefix
 (dropdown starting on a "-- เลือกคำนำหน้า --" placeholder so the choice is explicit, incl.
-"อื่นๆ (ระบุ)" free-text), name-surname, age, address, phone, line ID,
-reference person. **Required** (marked `*`, enforced client- and server-side): prefix (plus the
-free-text prefix when "อื่นๆ"), name-surname, age (integer 1-120), address, phone (digits/spaces/
-`-`/`+`, 9-15 digits). Name-surname may contain only Thai letters/vowels/tone marks/digits, English
-letters, digits, spaces, and dashes (`isValidPersonName()` in `includes/input.php`); symbols such
-as `/`, `*`, `&`, `.`, `฿` are rejected. Line ID and reference person are optional. On a validation error
+"อื่นๆ (ระบุ)" free-text), name-surname, age, address, province, postal code, mobile phone, LINE
+name, LINE ID, how they heard about the course, new/returning student, previous student ID,
+referring friend, reason for studying, can they use ZOOM, have they joined the class room. The
+fields, their order and their captions mirror the course's Google Form (รุ่น 7); the four
+multiple-choice questions are radio buttons whose options live in `STUDENT_CHOICE_FIELDS`
+(`includes/student_validation.php`), each with an "อื่นๆ (ระบุ)" free-text option stored in a
+`{field}_other` column. **Required** (marked `*`, enforced client- and server-side): everything
+except previous student ID and referring friend — prefix (plus the free-text prefix when "อื่นๆ"),
+name-surname, age (integer 1-120), address, province, postal code (5 digits), phone (digits/spaces/
+`-`/`+`, 9-15 digits), LINE name, LINE ID, the four choices (plus their free text when "อื่นๆ"),
+reason. Previous student ID, when given, is 4-10 digits. Name-surname may contain only Thai
+letters/vowels/tone marks/digits, English letters, digits, spaces, and dashes (`isValidPersonName()`
+in `includes/input.php`); symbols such as `/`, `*`, `&`, `.`, `฿` are rejected. The fields added for
+the Google Form are required only on public registration (`validateStudentFields($raw, true)`); the
+CSV import and admin edit page keep them optional because older students don't have them. On a validation error
 `register.php` stashes the entered values in `$_SESSION['register_old']` and `index.php` refills
 the form once, with a message naming the missing fields. Always targets whichever batch currently has
 `registration_open = TRUE` at level `จูฬตรี`. Inserted as `status = 'pending'`. Rate-limited.
@@ -273,7 +297,7 @@ single-digit batch (e.g. รุ่น 7) and 5 digits for a two-digit batch (e.g
 - `batch_no` = the batch number as-is (`7`, `10`, `23`, ...).
 - `group_digit` starts at a base value per prefix:
   - `0` = พระ
-  - `1` = สิกขามานา / สามเณร / สามเณรี / แม่ชี
+  - `1` = สิกขมานา / สามเณร / สามเณรี / แม่ชี
   - `2` = นาย / นาง / นางสาว / **อื่นๆ** (these four share one running count)
 - Compute from `student_id_sequences.last_seq` (a running **count**, 0-based, per
   batch+group) as:
@@ -283,7 +307,7 @@ single-digit batch (e.g. รุ่น 7) and 5 digits for a two-digit batch (e.g
 **Overflow / bucket rollover:** once the นาย/นาง/นางสาว/อื่นๆ group passes 99 students in a
 batch, `group_digit` rolls from `2` to `3`, then `4`, `5`, ... up to `9` (e.g. รุ่น 7:
 `7201`...`7299`, then `7301`...`7399`, `7401`...). This is safe because digits `3`-`9` are
-otherwise unused. The พระ (`0`) and สิกขามานา group (`1`) groups do **not** have a defined
+otherwise unused. The พระ (`0`) and สิกขมานา group (`1`) groups do **not** have a defined
 rollover — incrementing their digit would collide with the next real group's namespace — so
 if either ever exceeds 99 students in a single batch, the admin must manually assign IDs
 beyond that point (already supported via override + the `UNIQUE` constraint on

@@ -122,7 +122,9 @@ Production runs the app as a git checkout of this repo, owned by the web server 
    `sudo -u www-data php cron/backup.php`
 3. Pull as the web server user so file ownership stays consistent with the cron jobs:
    `sudo -u www-data git -C <app dir> pull --ff-only`
-4. Lint: `php -l` on the changed files, then smoke-test the affected pages.
+4. Apply any new file in `migrations/` (after the backup), once, in name order:
+   `mysql <db name> < migrations/<file>.sql`. `schema.sql` already includes them for fresh installs.
+5. Lint: `php -l` on the changed files, then smoke-test the affected pages.
 
 To roll back, `git reset --hard <previous commit>` in the app directory (and restore the backup
 with `gunzip -c backups/<file>.sql.gz | mysql <db name>` if data was changed; older backups are
@@ -145,7 +147,7 @@ one can brute-force an account:
   backup emails only, plain-text body with optional attachments). Swap in PHPMailer
   if you need HTML email.
 - Only the นาย/นาง/นางสาว/อื่นๆ student-ID group has an auto-rollover for batches
-  with more than 99 students; พระ and the สิกขามานา/สามเณร/สามเณรี/แม่ชี group fall
+  with more than 99 students; พระ and the สิกขมานา/สามเณร/สามเณรี/แม่ชี group fall
   back to manual ID entry in that (unlikely) case — see `DESIGN.md` section 5.
 - An admin's feature permissions are set when the account is created and can't be changed from
   the UI afterwards (only password, enabled state, or deletion). Adjust `admin_permissions` in SQL
@@ -153,7 +155,8 @@ one can brute-force an account:
 - An admin who has promoted students can't be deleted (`promotions.promoted_by` keeps that
   history); disable the account instead.
 - The CSV import reads columns by position, not by header name, and always skips the first row,
-  so keep the template's column order.
+  so keep the template's column order. Columns from "จังหวัด" onward are optional, so files made
+  from the older 9-column template still import.
 - Sorting Thai names/prefixes in the admin report uses MySQL's collation, which doesn't apply Thai
   leading-vowel ordering (e.g. แม่ชี sorts after สามเณร). Proper Thai sorting would need PHP's
   `intl` extension.

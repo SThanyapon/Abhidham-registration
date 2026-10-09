@@ -5,14 +5,14 @@ require_once __DIR__ . '/db.php';
 /**
  * Maps a prefix to its base group digit:
  *   0 = พระ
- *   1 = สิกขามานา / สามเณร / สามเณรี / แม่ชี
+ *   1 = สิกขมานา / สามเณร / สามเณรี / แม่ชี
  *   2 = นาย / นาง / นางสาว / อื่นๆ (share one running count, with overflow rollover)
  */
 function prefixGroup(string $prefix): int
 {
     return match ($prefix) {
         'พระ' => 0,
-        'สิกขามานา', 'สามเณร', 'สามเณรี', 'แม่ชี' => 1,
+        'สิกขมานา', 'สามเณร', 'สามเณรี', 'แม่ชี' => 1,
         default => 2,
     };
 }

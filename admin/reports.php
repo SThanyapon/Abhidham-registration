@@ -56,7 +56,16 @@ if ($view === 'approved') {
         'age' => 'อายุ',
         'phone' => 'เบอร์โทรศัพท์',
         'line_id' => 'Line ID',
+        'line_name' => 'ชื่อไลน์',
         'reference_person' => 'ผู้แนะนำ',
+        'province' => 'จังหวัด',
+        'postal_code' => 'รหัสไปรษณีย์',
+        'heard_from' => 'ทราบข่าวจาก',
+        'student_type' => 'นักศึกษาเก่า/ใหม่',
+        'previous_student_no' => 'รหัสนักศึกษาเดิม',
+        'study_reason' => 'เหตุผลที่มาเรียน',
+        'zoom_skill' => 'ใช้ ZOOM',
+        'joined_classroom' => 'เข้าห้องเรียน',
         'created_at' => 'วันที่สมัคร',
     ];
     $rejectedSortable = ['prefix', 'full_name', 'batch', 'created_at'];
@@ -112,8 +121,7 @@ if ($view === 'approved') {
 
     // No class-level join: rejected students never get a level assigned.
     $stmt = $mysqli->prepare(
-        "SELECT s.id, s.prefix, s.prefix_other, s.full_name, s.age, s.phone, s.line_id, s.reference_person,
-                s.created_at, b.batch_no, b.name AS batch_name
+        "SELECT s.*, b.batch_no, b.name AS batch_name
          FROM students s
          JOIN batches b ON b.id = s.batch_id
          WHERE s.status = 'rejected'
@@ -218,7 +226,16 @@ if ($exportCsv) {
                 $r['age'] ?? '-',
                 $r['phone'] ?: '-',
                 $r['line_id'] ?: '-',
+                $r['line_name'] ?: '-',
                 $r['reference_person'] ?: '-',
+                $r['province'] ?: '-',
+                $r['postal_code'] ?: '-',
+                studentChoice($r, 'heard_from'),
+                studentChoice($r, 'student_type'),
+                $r['previous_student_no'] ?: '-',
+                $r['study_reason'] ?: '-',
+                studentChoice($r, 'zoom_skill'),
+                studentChoice($r, 'joined_classroom'),
                 substr((string) $r['created_at'], 0, 10),
             ]);
         }
@@ -361,7 +378,16 @@ $exportHref = 'reports.php?export=csv&view=' . $view . '&sort=' . urlencode($sor
                             <td><?= htmlspecialchars((string) ($r['age'] ?? '-')) ?></td>
                             <td><?= htmlspecialchars($r['phone'] ?: '-') ?></td>
                             <td><?= htmlspecialchars($r['line_id'] ?: '-') ?></td>
+                            <td><?= htmlspecialchars($r['line_name'] ?: '-') ?></td>
                             <td><?= htmlspecialchars($r['reference_person'] ?: '-') ?></td>
+                            <td><?= htmlspecialchars($r['province'] ?: '-') ?></td>
+                            <td><?= htmlspecialchars($r['postal_code'] ?: '-') ?></td>
+                            <td><?= htmlspecialchars(studentChoice($r, 'heard_from')) ?></td>
+                            <td><?= htmlspecialchars(studentChoice($r, 'student_type')) ?></td>
+                            <td><?= htmlspecialchars($r['previous_student_no'] ?: '-') ?></td>
+                            <td><?= htmlspecialchars($r['study_reason'] ?: '-') ?></td>
+                            <td><?= htmlspecialchars(studentChoice($r, 'zoom_skill')) ?></td>
+                            <td><?= htmlspecialchars(studentChoice($r, 'joined_classroom')) ?></td>
                             <td><?= htmlspecialchars(formatDateBEShort(substr((string) $r['created_at'], 0, 10))) ?></td>
                         </tr>
                     <?php endforeach; ?>
