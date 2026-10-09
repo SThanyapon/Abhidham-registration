@@ -197,7 +197,7 @@ multiple-choice questions' options and control types live in `STUDENT_CHOICE_FIE
 the picked options joined with ", " in option order), นักศึกษาเก่าหรือใหม่ a single-choice dropdown,
 the ZOOM and joined-classroom questions radio buttons (no fieldset frame). Previous student ID is
 hidden (and disabled) unless นักศึกษาเก่าหรือใหม่ is the เก่า option and is discarded server-side otherwise.
-Province is a dropdown of Thailand's 77 provinces (`THAI_PROVINCES`, province-code order, default
+Province is a dropdown of Thailand's 77 provinces (`THAI_PROVINCES`, Thai alphabetical order, default
 กรุงเทพมหานคร) plus "อยู่ต่างประเทศ"; public registration must pick from it, and picking อยู่ต่างประเทศ
 hides the postal code (not required, stored NULL; the address field carries the overseas address).
 The CSV import and admin edit accept other province text so older free-text answers survive. **Required** (marked `*`, enforced client- and server-side): everything
