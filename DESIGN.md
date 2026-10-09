@@ -196,7 +196,11 @@ multiple-choice questions' options and control types live in `STUDENT_CHOICE_FIE
 `{field}_other` column: ทราบข่าวจากช่องทางใด is the browser's multi-select list (pick one or more; stored as
 the picked options joined with ", " in option order), นักศึกษาเก่าหรือใหม่ a single-choice dropdown,
 the ZOOM and joined-classroom questions radio buttons (no fieldset frame). Previous student ID is
-hidden (and disabled) unless นักศึกษาเก่าหรือใหม่ is the เก่า option and is discarded server-side otherwise. **Required** (marked `*`, enforced client- and server-side): everything
+hidden (and disabled) unless นักศึกษาเก่าหรือใหม่ is the เก่า option and is discarded server-side otherwise.
+Province is a dropdown of Thailand's 77 provinces (`THAI_PROVINCES`, province-code order, default
+กรุงเทพมหานคร) plus "อยู่ต่างประเทศ"; public registration must pick from it, and picking อยู่ต่างประเทศ
+hides the postal code (not required, stored NULL; the address field carries the overseas address).
+The CSV import and admin edit accept other province text so older free-text answers survive. **Required** (marked `*`, enforced client- and server-side): everything
 except previous student ID and referring friend — prefix (plus the free-text prefix when "อื่นๆ"),
 name-surname, age (integer 1-120), address, province, postal code (5 digits), phone (digits/spaces/
 `-`/`+`, 9-15 digits), LINE name, LINE ID, the four choices (plus their free text when "อื่นๆ"),

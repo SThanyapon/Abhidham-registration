@@ -53,6 +53,60 @@ function studentChoiceField(string $field, string $caption, string $value, strin
 }
 
 /**
+ * HTML for the จังหวัด dropdown (THAI_PROVINCES + PROVINCE_ABROAD) and the รหัสไปรษณีย์ box, which is
+ * hidden and disabled while PROVINCE_ABROAD is picked (provinceScript() keeps that in sync). A
+ * stored province that isn't in the list (an older free-text answer) is kept as an extra option so
+ * the admin edit page doesn't lose it. Shared by index.php and admin/students.php.
+ */
+function provinceFields(string $province, string $postalCode, bool $required): string
+{
+    $mark = $required ? '<span class="required-mark">*</span>' : '';
+    $choices = [...THAI_PROVINCES, PROVINCE_ABROAD];
+    if ($province !== '' && !in_array($province, $choices, true)) {
+        array_unshift($choices, $province);
+    }
+
+    $html = '<label for="province">จังหวัด' . $mark . '</label>'
+        . '<select id="province" name="province"' . ($required ? ' required' : '') . ' onchange="syncPostalCode()">'
+        . '<option value="">-- เลือกจังหวัด --</option>';
+    foreach ($choices as $choice) {
+        $html .= '<option value="' . htmlspecialchars($choice) . '"' . ($choice === $province ? ' selected' : '')
+            . '>' . htmlspecialchars($choice) . '</option>';
+    }
+    $html .= '</select>';
+
+    $abroad = $province === PROVINCE_ABROAD;
+
+    return $html
+        . '<div id="postal_code_wrap" class="field-group"' . ($abroad ? ' hidden' : '') . '>'
+        . '<label for="postal_code">รหัสไปรษณีย์' . $mark . '</label>'
+        . '<input type="text" id="postal_code" name="postal_code" inputmode="numeric"' . ($required ? ' required' : '')
+        . ' pattern="[0-9]{5}" maxlength="5" title="ตัวเลข 5 หลัก" value="' . htmlspecialchars($postalCode) . '"'
+        . ($abroad ? ' disabled' : '') . '>'
+        . '</div>';
+}
+
+// Script for provinceFields(): hides and disables the postal code box while อยู่ต่างประเทศ is picked.
+function provinceScript(): string
+{
+    $abroad = json_encode(PROVINCE_ABROAD, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
+
+    return <<<HTML
+        <script>
+            function syncPostalCode() {
+                const abroad = document.getElementById('province').value === $abroad;
+                const input = document.getElementById('postal_code');
+                document.getElementById('postal_code_wrap').hidden = abroad;
+                input.disabled = abroad;
+                if (abroad) {
+                    input.value = '';
+                }
+            }
+        </script>
+        HTML;
+}
+
+/**
  * Whether the previous_student_no field (#previous_student_no_wrap) should be shown and enabled:
  * only for a returning student. studentChoiceScript() keeps it in sync when the dropdown changes.
  */

@@ -4,6 +4,27 @@ require_once __DIR__ . '/input.php';
 
 const STUDENT_PREFIXES = ['พระ', 'สิกขมานา', 'สามเณร', 'สามเณรี', 'แม่ชี', 'นาย', 'นาง', 'นางสาว', 'อื่นๆ'];
 
+// The province dropdown on the registration form: Thailand's 77 provinces (in province-code order,
+// from the provinces.json list the course supplied), then PROVINCE_ABROAD.
+const THAI_PROVINCES = [
+    'กรุงเทพมหานคร', 'สมุทรปราการ', 'นนทบุรี', 'ปทุมธานี', 'พระนครศรีอยุธยา', 'อ่างทอง', 'ลพบุรี',
+    'สิงห์บุรี', 'ชัยนาท', 'สระบุรี', 'ชลบุรี', 'ระยอง', 'จันทบุรี', 'ตราด', 'ฉะเชิงเทรา',
+    'ปราจีนบุรี', 'นครนายก', 'สระแก้ว', 'นครราชสีมา', 'บุรีรัมย์', 'สุรินทร์', 'ศรีสะเกษ',
+    'อุบลราชธานี', 'ยโสธร', 'ชัยภูมิ', 'อำนาจเจริญ', 'หนองบัวลำภู', 'ขอนแก่น', 'อุดรธานี', 'เลย',
+    'หนองคาย', 'มหาสารคาม', 'ร้อยเอ็ด', 'กาฬสินธุ์', 'สกลนคร', 'นครพนม', 'มุกดาหาร', 'เชียงใหม่',
+    'ลำพูน', 'ลำปาง', 'อุตรดิตถ์', 'แพร่', 'น่าน', 'พะเยา', 'เชียงราย', 'แม่ฮ่องสอน', 'นครสวรรค์',
+    'อุทัยธานี', 'กำแพงเพชร', 'ตาก', 'สุโขทัย', 'พิษณุโลก', 'พิจิตร', 'เพชรบูรณ์', 'ราชบุรี',
+    'กาญจนบุรี', 'สุพรรณบุรี', 'นครปฐม', 'สมุทรสาคร', 'สมุทรสงคราม', 'เพชรบุรี', 'ประจวบคีรีขันธ์',
+    'นครศรีธรรมราช', 'กระบี่', 'พังงา', 'ภูเก็ต', 'สุราษฎร์ธานี', 'ระนอง', 'ชุมพร', 'สงขลา', 'สตูล',
+    'ตรัง', 'พัทลุง', 'ปัตตานี', 'ยะลา', 'นราธิวาส', 'บึงกาฬ',
+];
+
+// Province answer for students living outside Thailand: no Thai postal code applies.
+const PROVINCE_ABROAD = 'อยู่ต่างประเทศ';
+
+// Pre-selected in the registration form's province dropdown.
+const DEFAULT_PROVINCE = 'กรุงเทพมหานคร';
+
 // The student_type answer that enables previous_student_no (returning student).
 const STUDENT_TYPE_RETURNING = 'เก่า (เคยเรียนที่วัดศรีสุดาฯ แต่ จะมาเรียนใหม่อีกรอบ)';
 
@@ -118,6 +139,12 @@ function validateStudentFields(array $raw, bool $requireRegistrationExtras = fal
         }
     }
 
+    // A Thai postal code doesn't apply abroad (the form hides the box); the address holds it all.
+    $abroad = $clean['province'] === PROVINCE_ABROAD;
+    if ($abroad) {
+        $clean['postal_code'] = '';
+    }
+
     // Only a returning student has a previous ID (the form disables the box otherwise).
     if ($clean['student_type'] !== STUDENT_TYPE_RETURNING) {
         $clean['previous_student_no'] = '';
@@ -141,7 +168,7 @@ function validateStudentFields(array $raw, bool $requireRegistrationExtras = fal
     if ($requireRegistrationExtras && $clean['province'] === '') {
         $missing[] = 'จังหวัด';
     }
-    if ($requireRegistrationExtras && $clean['postal_code'] === '') {
+    if ($requireRegistrationExtras && !$abroad && $clean['postal_code'] === '') {
         $missing[] = 'รหัสไปรษณีย์';
     }
     if ($clean['phone'] === '') {
@@ -174,6 +201,12 @@ function validateStudentFields(array $raw, bool $requireRegistrationExtras = fal
 
     if (!ctype_digit($clean['age']) || (int) $clean['age'] < 1 || (int) $clean['age'] > 120) {
         return [$clean, 'กรุณากรอกอายุเป็นตัวเลข 1-120'];
+    }
+
+    // Public registration picks from the dropdown; the CSV import and admin edit keep free text
+    // because rows stored before the dropdown existed may hold other spellings.
+    if ($requireRegistrationExtras && !in_array($clean['province'], [...THAI_PROVINCES, PROVINCE_ABROAD], true)) {
+        return [$clean, 'กรุณาเลือกจังหวัดจากรายการ'];
     }
 
     if ($clean['postal_code'] !== '' && !preg_match('/^[0-9]{5}$/', $clean['postal_code'])) {

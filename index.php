@@ -101,13 +101,7 @@ function choiceField(array $old, string $field, string $caption, bool $required 
             <label for="address">ที่อยู่ในการส่งเอกสาร (กรอกให้ครบถ้วน ยกเว้น รหัสจังหวัด และ ไปรษณีย์ ให้กรอกในข้อถัดไป)<span class="required-mark">*</span></label>
             <textarea id="address" name="address" rows="3" required><?= oldValue($old, 'address') ?></textarea>
 
-            <label for="province">จังหวัด<span class="required-mark">*</span></label>
-            <input type="text" id="province" name="province" required value="<?= oldValue($old, 'province') ?>">
-
-            <label for="postal_code">รหัสไปรษณีย์<span class="required-mark">*</span></label>
-            <input type="text" id="postal_code" name="postal_code" inputmode="numeric" required
-                   pattern="[0-9]{5}" maxlength="5" title="ตัวเลข 5 หลัก"
-                   value="<?= oldValue($old, 'postal_code') ?>">
+            <?= provinceFields((string) ($old['province'] ?? DEFAULT_PROVINCE), (string) ($old['postal_code'] ?? ''), true) ?>
 
             <label for="phone">เบอร์มือถือ<span class="required-mark">*</span></label>
             <input type="tel" id="phone" name="phone" inputmode="tel" required
@@ -147,6 +141,7 @@ function choiceField(array $old, string $field, string $caption, bool $required 
         </form>
 
         <?= studentChoiceScript() ?>
+        <?= provinceScript() ?>
         <script>
             function togglePrefixOther() {
                 const isOther = document.getElementById('prefix').value === 'อื่นๆ';

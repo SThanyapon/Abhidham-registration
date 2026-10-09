@@ -127,7 +127,8 @@ block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
   `STUDENT_CHOICE_FIELDS` question as its control type (`radio`, `select`, or `multi` = the
   browser's `<select multiple>` posted as `field[]` and stored comma-joined) with a
   show-on-"อื่นๆ" text box, and shows `previous_student_no` only for a returning student
-  (`index.php`, `admin/students.php`).
+  (`index.php`, `admin/students.php`). `provinceFields()` + `provinceScript()` render the
+  `THAI_PROVINCES` dropdown (+ อยู่ต่างประเทศ, which hides the postal code).
 
 **UI conventions:** every user-facing string (captions, messages, CSV headers, emails) is Thai, and
 pages use `<html lang="th">` plus the Sarabun Google Font. All styling lives in `assets/style.css`
