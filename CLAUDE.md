@@ -46,8 +46,9 @@ php scripts/normalize_whitespace.php
 First-time setup requires copying `config.local.php.example` to `config.local.php` (gitignored) and
 filling in DB/SMTP credentials — `includes/db.php` calls `die()` if it's missing. Before students can
 register or check in, an admin must open a batch's registration and generate a class schedule via
-`/admin/classes.php` (see README.md). README.md also has the deploy procedure (git pull as
-`www-data` on the server).
+`/admin/classes.php` (see README.md). README.md also has the full production installation
+(nginx allowlist + PHP-FPM, certbot, dedicated MySQL user, www-data cron, php.ini) and the deploy
+procedure (git pull as `www-data` on the server).
 
 ## Architecture
 
@@ -55,7 +56,9 @@ register or check in, an admin must open a batch's registration and generate a c
 layer. Public pages (`index.php`, `register.php`, `checkin.php`, `lookup.php`) render forms with inline
 HTML/PHP and POST to sibling scripts. Admin pages under `admin/` follow the same pattern but require
 login. There is no templating engine; HTML is written directly in the `.php` files after the PHP logic
-block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
+block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output. Production nginx is an
+allowlist (`/`, the four public `.php` files, `/admin/*.php`, `/assets/`; everything else 404), so a
+new top-level page also needs the server's nginx regex updated (see README "Deploying").
 
 `index.php` is a landing page. While a batch has registration open, the first view in a session pops
 up the intake poster (`assets/images/landingpage.jpg`, a `<dialog>`, flagged by

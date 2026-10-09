@@ -430,10 +430,12 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
   Admin sessions expire after `ADMIN_IDLE_TIMEOUT_SECONDS` (1 hour) idle.
 - **CSV exports**: `csvSafe()` neutralises formula-leading values (CSV/Excel injection).
 - **Mail**: the SMTP client aborts instead of authenticating if STARTTLS fails.
-- **Deployment**: the web server serves only the public `.php` entry points and `assets/`. Config
-  (incl. `.bak` copies), `includes/`, `cron/`, `scripts/`, `migrations/`, `backups/`, `.git` and
-  `*.sql/*.md` are denied. `cron/` and `scripts/` also refuse non-CLI execution. See README
-  "Deploying".
+- **Deployment**: nginx serves an allowlist (`/`, the four public `.php` entry points,
+  `/admin/*.php`, `/assets/`) and returns 404 for everything else, so config (incl. `.bak` copies),
+  `includes/`, `cron/`, `scripts/`, `migrations/`, `backups/`, `logs/`, `.git` and the docs are
+  unreachable. An earlier deny-list config missed `backups/`, so backups were downloadable by exact
+  file name. Access logs showed no outside download before the switch (October 2026). `cron/` and
+  `scripts/` also refuse non-CLI execution. See README "Deploying".
 - Admin accounts: a disabled or deleted account is rejected at login and also logged out on
   its next request (`requireAdminLogin()` re-checks `is_active`). Resetting a password deletes the
   account's pending OTP codes. An admin can't disable or delete their own account, so at least one

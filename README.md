@@ -11,15 +11,19 @@ original requirements.
 - PHP 8.0+ (the codebase uses `match` expressions and typed properties). The production VM
   runs PHP 8.5.
 - MySQL/MariaDB with the `mysqli` extension.
+- PHP extensions `mbstring`, `zlib` (gzip backups) and `openssl` (SMTP over TLS/SSL).
 - The `iconv` extension (bundled with most PHP builds) for importing CSV files saved in Windows-874
   (Thai Excel's default); UTF-8 CSVs don't need it.
+- An SMTP account for sending admin OTP codes and backup emails. Admin login can't work without it.
 
-## Setup
+## Local setup (development)
 
 1. Copy `config.local.php.example` to `config.local.php` and fill in your MySQL
    and SMTP (email) credentials. `config.local.php` is gitignored so secrets never
-   get committed.
-2. Import the schema (creates the database and seeds the 9 class levels):
+   get committed. The other keys (`rate_limit`, `otp.ttl_seconds`, `backup.directory`,
+   `backup.recipient_email`) have working defaults.
+2. Import the schema (creates the `abhidham_registration` database and seeds the 9 class levels;
+   it already includes every file in `migrations/`, so don't apply those to a fresh install):
    ```
    mysql -u root -p < schema.sql
    ```
@@ -63,6 +67,89 @@ original requirements.
 The UI is entirely in Thai and loads the Sarabun font from Google Fonts (falls back to the system
 font when offline).
 
+The session cookie is marked `Secure` only over HTTPS, so login works on plain
+`http://localhost` too.
+
+## Production installation (Linux, nginx + PHP-FPM)
+
+The steps below match the production VM (Ubuntu, nginx, PHP-FPM, MySQL, app at `/opt/abhidham`).
+Substitute your own domain, paths and PHP version.
+
+1. **Packages**: nginx, MySQL server, `php-fpm` and `php-mysql php-mbstring` (zlib, openssl and
+   iconv are built in on Ubuntu's PHP), git, and certbot with its nginx plugin.
+2. **Code**: clone the repo to `/opt/abhidham`, owned by `www-data` and closed to other users:
+   ```
+   sudo git clone <repo url> /opt/abhidham
+   sudo chown -R www-data:www-data /opt/abhidham && sudo chmod 750 /opt/abhidham
+   ```
+3. **Database**: import the schema, then create a dedicated MySQL user for the app instead of
+   using root:
+   ```
+   sudo mysql < /opt/abhidham/schema.sql
+   sudo mysql -e "CREATE USER 'abhidham'@'localhost' IDENTIFIED BY '<strong password>';
+     GRANT SELECT, INSERT, UPDATE, DELETE ON abhidham_registration.* TO 'abhidham'@'localhost';"
+   ```
+   The backup only reads (`SHOW CREATE TABLE`, `SELECT`), so the app needs no DDL rights.
+   Restoring a backup is done as root.
+4. **Config**: copy `config.local.php.example` to `config.local.php`. Fill in the DB user from
+   step 3 and the SMTP account, and set `backup.directory` (default `<app>/backups`). Make it
+   readable only by `www-data`:
+   ```
+   sudo -u www-data cp /opt/abhidham/config.local.php.example /opt/abhidham/config.local.php
+   sudo chmod 640 /opt/abhidham/config.local.php    # then edit it with sudoedit
+   ```
+5. **First admin**:
+   `sudo -u www-data php /opt/abhidham/scripts/create_admin.php <username> <email> <password>`.
+6. **nginx**: an allowlist. Only the public pages, admin pages and `assets/` are served, and
+   everything else returns 404, so docs, `backups/` (full personal-data dumps), `logs/`, `.git` and
+   config files are never downloadable. Site config (`/etc/nginx/sites-enabled/abhidham`):
+   ```nginx
+   server {
+       server_name <your domain>;
+       root /opt/abhidham;
+       index index.php;
+       server_tokens off;
+
+       add_header X-Frame-Options "DENY" always;
+       add_header X-Content-Type-Options "nosniff" always;
+       add_header Referrer-Policy "same-origin" always;
+       add_header Strict-Transport-Security "max-age=31536000" always;
+
+       location = / { }
+       location ^~ /assets/ { try_files $uri =404; }
+       location ~ ^/(index|register|checkin|lookup)\.php$ { include snippets/abhidham-php.conf; }
+       location ~ ^/admin/[a-z_]+\.php$ { include snippets/abhidham-php.conf; }
+       location / { return 404; }
+   }
+   ```
+   and `/etc/nginx/snippets/abhidham-php.conf`:
+   ```nginx
+   fastcgi_pass unix:/run/php/php8.5-fpm.sock;   # match your PHP-FPM version
+   fastcgi_index index.php;
+   fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+   include fastcgi_params;
+   ```
+   **A new top-level public `.php` page must be added to the regex**, or it will return 404.
+   Run `sudo nginx -t && sudo systemctl reload nginx` after any change.
+7. **HTTPS**: `sudo certbot --nginx -d <your domain>`. Certbot adds the `listen 443 ssl` and
+   certificate lines plus the HTTP-to-HTTPS redirect. HTTPS is required: the session cookie is
+   only marked `Secure` over HTTPS, and HSTS is sent.
+8. **PHP settings** (FPM `php.ini`): `display_errors = Off`, `log_errors = On`, `expose_php = Off`.
+   Then restart PHP-FPM.
+9. **Scheduled jobs** (`sudo crontab -u www-data -e`). Output goes to `logs/`, which nginx never
+   serves:
+   ```
+   0 23 * * 6 /usr/bin/php /opt/abhidham/cron/backup.php >> /opt/abhidham/logs/backup.log 2>&1
+   0 * * * * /usr/bin/php /opt/abhidham/cron/clear_expired_otp.php >> /opt/abhidham/logs/clear_expired_otp.log 2>&1
+   ```
+   Create `logs/` and `backups/` first, owned by `www-data`.
+10. **Check from outside**: `curl -I https://<your domain>/` should return 200 with the four
+    security headers and a `Set-Cookie` showing `secure; HttpOnly; SameSite=Lax`.
+    `/README.md`, `/config.local.php`, `/backups/` and `/.git/config` should return 404. Then log in
+    to `/admin/login.php` (the OTP email proves SMTP works) and run a manual backup from
+    `/admin/backup.php`.
+11. Open a batch's registration and create its class schedule (next section).
+
 ## Before students can register or check in
 
 An admin needs to, via `/admin/classes.php`:
@@ -87,7 +174,7 @@ Point Windows Task Scheduler (or cron on Linux) at both on whatever interval you
 
 ## Maintenance scripts
 
-- `scripts/create_admin.php` — create an admin user (see Setup).
+- `scripts/create_admin.php` — create an admin user (see Local setup step 3 / Production installation step 5).
 - Features 0, 6 and 7 (manage admins, CSV import, edit student) were added later. To grant them to every
   existing admin on a database set up before them, run once:
   ```sql
@@ -128,13 +215,10 @@ Production runs the app as a git checkout of this repo, owned by the web server 
    `mysql <db name> < migrations/<file>.sql`. `schema.sql` already includes them for fresh installs.
 5. Lint: `php -l` on the changed files, then smoke-test the affected pages.
 
-The web server must serve only the public `.php` entry points and `assets/`. Deny everything
-else: dotfiles (`.git`), `includes/`, `cron/`, `scripts/`, `migrations/`, `backups/`, `logs/`,
-`config*` (incl. `config.local.php.bak.*` copies, which PHP would serve as plain text) and
-`*.sql`, `*.gz`, `*.md`. Ideally keep `backup.directory` outside the web root, and send the headers
-`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin` and
-`Strict-Transport-Security`. In production php.ini, set `display_errors = Off` and `expose_php = Off`.
-Check from outside with `curl -I https://<site>/<path>` (expect 403/404).
+Migrations change the schema, so apply them as MySQL root, not the app's restricted user. nginx is
+an allowlist (see Production installation step 6): a deploy that adds a new top-level public `.php`
+page must also add it to the nginx regex, or it will return 404. Check from outside with
+`curl -I https://<site>/<path>`; anything not on the allowlist should return 404.
 
 To roll back, `git reset --hard <previous commit>` in the app directory (and restore the backup
 with `gunzip -c backups/<file>.sql.gz | mysql <db name>` if data was changed; older backups are
