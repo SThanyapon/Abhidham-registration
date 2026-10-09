@@ -288,64 +288,14 @@ img.bottom-banner {
     display: none;
 }
 
-/* Multi-select dropdown: a <details> whose <summary> looks like a <select> */
-.multi-select {
-    position: relative;
+/* Multi-select list (ทราบข่าวจากช่องทางใด): the browser's own <select multiple>, all options visible */
+select[multiple] {
+    padding: 6px;
 }
 
-.multi-select summary {
-    list-style: none;
-    cursor: pointer;
-    padding: 10px 36px 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface-alt);
-    color: var(--text);
-    position: relative;
-}
-
-.multi-select summary::-webkit-details-marker {
-    display: none;
-}
-
-.multi-select summary::after {
-    content: "▾";
-    position: absolute;
-    right: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--muted);
-}
-
-.multi-select summary.placeholder {
-    color: var(--muted);
-}
-
-.multi-select[open] summary {
-    border-color: var(--primary);
-    background: var(--surface);
-    box-shadow: var(--focus-ring);
-}
-
-.multi-select-options {
-    position: absolute;
-    z-index: 10;
-    left: 0;
-    right: 0;
-    margin-top: 4px;
-    padding: 8px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    box-shadow: var(--shadow);
-}
-
-input:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
+select[multiple] option {
+    padding: 6px 8px;
+    border-radius: 6px;
 }
 
 input,

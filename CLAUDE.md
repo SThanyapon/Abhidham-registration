@@ -124,9 +124,9 @@ block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
   student field is added in this file (plus the form, schema and a migration). Change validation
   here, not in the callers.
 - `student_form.php` — `studentChoiceField()` + `studentChoiceScript()`: renders a
-  `STUDENT_CHOICE_FIELDS` question as its control type (`radio`, `select`, or `multi` = a
-  `<details>` dropdown of checkboxes posted as `field[]` and stored comma-joined) with a
-  show-on-"อื่นๆ" text box, and enables `previous_student_no` only for a returning student
+  `STUDENT_CHOICE_FIELDS` question as its control type (`radio`, `select`, or `multi` = the
+  browser's `<select multiple>` posted as `field[]` and stored comma-joined) with a
+  show-on-"อื่นๆ" text box, and shows `previous_student_no` only for a returning student
   (`index.php`, `admin/students.php`).
 
 **UI conventions:** every user-facing string (captions, messages, CSV headers, emails) is Thai, and

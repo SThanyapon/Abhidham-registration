@@ -125,11 +125,13 @@ function choiceField(array $old, string $field, string $caption, bool $required 
 
             <?= choiceField($old, 'student_type', 'นักศึกษาเก่าหรือใหม่?') ?>
 
-            <label for="previous_student_no">โปรดระบุรหัสนักศึกษาเดิมของท่าน</label>
-            <input type="text" id="previous_student_no" name="previous_student_no" inputmode="numeric"
-                   pattern="[0-9]{4,10}" title="ตัวเลข 4-10 หลัก"
-                   value="<?= oldValue($old, 'previous_student_no') ?>"
-                   <?= previousStudentNoState((string) ($old['student_type'] ?? '')) ?>>
+            <?php $returning = isReturningStudent((string) ($old['student_type'] ?? '')); ?>
+            <div id="previous_student_no_wrap" class="field-group" <?= $returning ? '' : 'hidden' ?>>
+                <label for="previous_student_no">โปรดระบุรหัสนักศึกษาเดิมของท่าน</label>
+                <input type="text" id="previous_student_no" name="previous_student_no" inputmode="numeric"
+                       pattern="[0-9]{4,10}" title="ตัวเลข 4-10 หลัก"
+                       value="<?= oldValue($old, 'previous_student_no') ?>" <?= $returning ? '' : 'disabled' ?>>
+            </div>
 
             <label for="reference_person">โปรดระบุ ชื่อนามสกุล เบอร์โทร ของเพื่อนที่แนะนำมา</label>
             <input type="text" id="reference_person" name="reference_person" value="<?= oldValue($old, 'reference_person') ?>">

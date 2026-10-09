@@ -4,7 +4,7 @@ require_once __DIR__ . '/student_validation.php';
 
 /**
  * HTML for one STUDENT_CHOICE_FIELDS question, using its control type: radio buttons, a single-choice
- * dropdown, or a dropdown of checkboxes ('multi', posted as {field}[]). Followed by the {field}_other
+ * dropdown, or the browser's multi-select ('multi', posted as {field}[]). Followed by the {field}_other
  * text box, which is shown (and required) only while อื่นๆ is picked. $value is the stored answer
  * ('multi' answers joined with STUDENT_MULTI_SEPARATOR). Shared by index.php and admin/students.php;
  * the page must also output studentChoiceScript().
@@ -27,19 +27,15 @@ function studentChoiceField(string $field, string $caption, string $value, strin
         }
         $html .= '</select>';
     } elseif ($control === 'multi') {
-        // <details> acts as the dropdown; the summary lists what's ticked (filled in by the script).
-        $html = '<label for="' . $field . '_dropdown">' . htmlspecialchars($caption) . $mark . '</label>'
-            . '<details class="multi-select" id="' . $field . '_dropdown" data-field="' . $field . '"'
-            . ($required ? ' data-required="1"' : '') . '>'
-            . '<summary class="' . ($picked === [] ? 'placeholder' : '') . '">'
-            . ($picked === [] ? '-- เลือก (เลือกได้หลายข้อ) --' : htmlspecialchars(implode(STUDENT_MULTI_SEPARATOR, $picked)))
-            . '</summary><div class="multi-select-options">';
+        // The browser's own multi-select, tall enough to show every option.
+        $html = '<label for="' . $field . '">' . htmlspecialchars($caption) . $mark . '</label>'
+            . '<select id="' . $field . '" name="' . $field . '[]" multiple size="' . count($options) . '"'
+            . ($required ? ' required' : '') . $onchange . '>';
         foreach ($options as $option) {
-            $html .= '<label class="checkbox-label"><input type="checkbox" name="' . $field . '[]" value="'
-                . htmlspecialchars($option) . '"' . (in_array($option, $picked, true) ? ' checked' : '') . $onchange
-                . '> ' . $label($option) . '</label>';
+            $html .= '<option value="' . htmlspecialchars($option) . '"' . (in_array($option, $picked, true) ? ' selected' : '')
+                . '>' . $label($option) . '</option>';
         }
-        $html .= '</div></details>';
+        $html .= '</select><p class="form-note">เลือกได้หลายข้อ (คอมพิวเตอร์: กด Ctrl หรือ ⌘ ค้างไว้แล้วคลิก)</p>';
     } else {
         $html = '<label>' . htmlspecialchars($caption) . $mark . '</label>';
         foreach ($options as $option) {
@@ -57,19 +53,17 @@ function studentChoiceField(string $field, string $caption, string $value, strin
 }
 
 /**
- * Attributes for the previous_student_no input: disabled unless $studentType is the returning
- * option (studentChoiceScript() keeps it in sync when the dropdown changes).
+ * Whether the previous_student_no field (#previous_student_no_wrap) should be shown and enabled:
+ * only for a returning student. studentChoiceScript() keeps it in sync when the dropdown changes.
  */
-function previousStudentNoState(string $studentType): string
+function isReturningStudent(string $studentType): bool
 {
-    return $studentType === STUDENT_TYPE_RETURNING ? '' : 'disabled';
+    return $studentType === STUDENT_TYPE_RETURNING;
 }
 
 /**
- * Script for studentChoiceField(): toggles each อื่นๆ text box, keeps a multi-select's summary
- * text up to date, closes an open multi-select on an outside click, requires at least one ticked
- * box in a required multi-select on submit, and enables previous_student_no only for a returning
- * student.
+ * Script for studentChoiceField(): toggles each อื่นๆ text box, and shows/enables
+ * previous_student_no only for a returning student.
  */
 function studentChoiceScript(): string
 {
@@ -79,24 +73,16 @@ function studentChoiceScript(): string
         <script>
             function choiceValues(field) {
                 return Array.from(document.querySelectorAll(
-                    'input[name="' + field + '"]:checked, input[name="' + field + '[]"]:checked, select[name="' + field + '"]'
+                    'input[name="' + field + '"]:checked, select[name="' + field + '"] option:checked, '
+                        + 'select[name="' + field + '[]"] option:checked'
                 )).map(function (el) { return el.value; }).filter(function (v) { return v !== ''; });
             }
 
             function toggleChoiceOther(field) {
-                const values = choiceValues(field);
-                const isOther = values.indexOf('อื่นๆ') !== -1;
+                const isOther = choiceValues(field).indexOf('อื่นๆ') !== -1;
                 const other = document.getElementById(field + '_other');
                 other.hidden = !isOther;
                 other.required = isOther;
-
-                const dropdown = document.getElementById(field + '_dropdown');
-                if (dropdown) {
-                    const summary = dropdown.querySelector('summary');
-                    summary.textContent = values.length ? values.join(', ') : '-- เลือก (เลือกได้หลายข้อ) --';
-                    summary.classList.toggle('placeholder', values.length === 0);
-                    dropdown.querySelector('input').setCustomValidity('');
-                }
 
                 if (field === 'student_type') {
                     syncPreviousStudentNo();
@@ -104,37 +90,18 @@ function studentChoiceScript(): string
             }
 
             function syncPreviousStudentNo() {
+                const wrap = document.getElementById('previous_student_no_wrap');
                 const input = document.getElementById('previous_student_no');
-                if (!input) {
+                if (!wrap || !input) {
                     return;
                 }
                 const returning = choiceValues('student_type').indexOf($returning) !== -1;
+                wrap.hidden = !returning;
                 input.disabled = !returning;
                 if (!returning) {
                     input.value = '';
                 }
             }
-
-            document.addEventListener('click', function (event) {
-                document.querySelectorAll('details.multi-select[open]').forEach(function (dropdown) {
-                    if (!dropdown.contains(event.target)) {
-                        dropdown.open = false;
-                    }
-                });
-            });
-
-            document.querySelectorAll('details.multi-select[data-required]').forEach(function (dropdown) {
-                const form = dropdown.closest('form');
-                form.addEventListener('submit', function (event) {
-                    const first = dropdown.querySelector('input');
-                    if (choiceValues(dropdown.dataset.field).length === 0) {
-                        event.preventDefault();
-                        dropdown.open = true;
-                        first.setCustomValidity('กรุณาเลือกอย่างน้อย 1 ข้อ');
-                        first.reportValidity();
-                    }
-                });
-            });
         </script>
         HTML;
 }

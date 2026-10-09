@@ -193,10 +193,10 @@ referring friend, reason for studying, can they use ZOOM, have they joined the c
 fields, their order and their captions mirror the course's Google Form (รุ่น 7); the four
 multiple-choice questions' options and control types live in `STUDENT_CHOICE_FIELDS`
 (`includes/student_validation.php`), each with an "อื่นๆ (ระบุ)" free-text option stored in a
-`{field}_other` column: ทราบข่าวจากช่องทางใด is a dropdown of checkboxes (pick one or more; stored as
+`{field}_other` column: ทราบข่าวจากช่องทางใด is the browser's multi-select list (pick one or more; stored as
 the picked options joined with ", " in option order), นักศึกษาเก่าหรือใหม่ a single-choice dropdown,
 the ZOOM and joined-classroom questions radio buttons (no fieldset frame). Previous student ID is
-enabled only when นักศึกษาเก่าหรือใหม่ is the เก่า option and is discarded server-side otherwise. **Required** (marked `*`, enforced client- and server-side): everything
+hidden (and disabled) unless นักศึกษาเก่าหรือใหม่ is the เก่า option and is discarded server-side otherwise. **Required** (marked `*`, enforced client- and server-side): everything
 except previous student ID and referring friend — prefix (plus the free-text prefix when "อื่นๆ"),
 name-surname, age (integer 1-120), address, province, postal code (5 digits), phone (digits/spaces/
 `-`/`+`, 9-15 digits), LINE name, LINE ID, the four choices (plus their free text when "อื่นๆ"),

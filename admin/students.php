@@ -197,11 +197,14 @@ function adminChoiceField(array $student, string $field, string $caption): strin
 
             <?= adminChoiceField($student, 'student_type', 'นักศึกษาเก่าหรือใหม่') ?>
 
-            <label for="previous_student_no">รหัสนักศึกษาเดิม</label>
-            <input type="text" id="previous_student_no" name="previous_student_no" inputmode="numeric"
-                   pattern="[0-9]{4,10}" title="ตัวเลข 4-10 หลัก"
-                   value="<?= htmlspecialchars((string) ($student['previous_student_no'] ?? '')) ?>"
-                   <?= previousStudentNoState((string) ($student['student_type'] ?? '')) ?>>
+            <?php $returning = isReturningStudent((string) ($student['student_type'] ?? '')); ?>
+            <div id="previous_student_no_wrap" class="field-group" <?= $returning ? '' : 'hidden' ?>>
+                <label for="previous_student_no">รหัสนักศึกษาเดิม</label>
+                <input type="text" id="previous_student_no" name="previous_student_no" inputmode="numeric"
+                       pattern="[0-9]{4,10}" title="ตัวเลข 4-10 หลัก"
+                       value="<?= htmlspecialchars((string) ($student['previous_student_no'] ?? '')) ?>"
+                       <?= $returning ? '' : 'disabled' ?>>
+            </div>
 
             <label for="reference_person">เพื่อนที่แนะนำมา (ชื่อนามสกุล เบอร์โทร)</label>
             <input type="text" id="reference_person" name="reference_person"
