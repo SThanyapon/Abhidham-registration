@@ -57,6 +57,11 @@ HTML/PHP and POST to sibling scripts. Admin pages under `admin/` follow the same
 login. There is no templating engine; HTML is written directly in the `.php` files after the PHP logic
 block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
 
+`index.php` is a landing page. While a batch has registration open, the first view in a session pops
+up the intake poster (`assets/images/landingpage.jpg`, a `<dialog>`, flagged by
+`$_SESSION['landing_seen']`). `?register=1` shows the form, and `?success=1` shows the classroom QR
+(`assets/images/qr-code7.jpg`). These images are per-intake content; swap the files for a new รุ่น.
+
 **`includes/` — shared logic, loaded via `require_once`, no autoloading:**
 - `db.php` — sets the PHP timezone to `Asia/Bangkok` (so `date('Y-m-d')` "today" rolls over at
   Thai midnight), `getConfig()` (lazy-loads `config.local.php` into `$GLOBALS`) and `getDbConnection()`
@@ -78,10 +83,11 @@ block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output.
   still capped per targeted account, not just per source. OTP verification (`admin/verify_otp.php`) adds
   its own `otp_verify` bucket keyed by the pending admin ID.
 - `otp.php` — 6-digit OTP generation/verification for admin login, hashed at rest in `otp_codes`,
-  single-use, TTL from config.
+  single-use, TTL from config. Issuing a code retires the account's earlier unused codes.
 - `mailer.php` — a hand-rolled minimal SMTP client (`sendEmail`) used for OTP codes and backup
   files. Plain-text body plus optional attachments (`multipart/mixed`, base64), with SMTP
-  dot-stuffing; no Composer/PHPMailer dependency. Swap this file if HTML email is ever needed.
+  dot-stuffing; no Composer/PHPMailer dependency. Aborts (returns false) if STARTTLS fails, so
+  credentials never go out in clear text. Swap this file if HTML email is ever needed.
 - `student_id.php` — `generateStudentNo()`: the student ID allocation algorithm. Uses a
   `FOR UPDATE`-locked transaction on `student_id_sequences` (per batch + prefix group running count) to
   avoid races, then derives `{batch_no}{group_digit}{2-digit seq}`. The นาย/นาง/นางสาว/อื่นๆ group

@@ -36,7 +36,9 @@ original requirements.
    ```
 5. Open `http://localhost:8000`:
    - `/` — landing page; click "ลงทะเบียน" (Register) (or visit `/?register=1`) to open the
-     registration form
+     registration form. While a batch's registration is open, the first visit in a browser session
+     pops up the intake poster (`assets/images/landingpage.jpg`); after submitting, the page shows
+     the classroom QR code (`assets/images/qr-code7.jpg`). Replace those images for a new intake.
    - `/checkin.php` — "ลงชื่อ/ตรวจสอบการเข้าเรียน": student ID + name, then pick a class (each
      batch's current, highest class) and a session dated today or earlier to check in, or leave
      them blank to just view attendance progress
@@ -126,6 +128,14 @@ Production runs the app as a git checkout of this repo, owned by the web server 
    `mysql <db name> < migrations/<file>.sql`. `schema.sql` already includes them for fresh installs.
 5. Lint: `php -l` on the changed files, then smoke-test the affected pages.
 
+The web server must serve only the public `.php` entry points and `assets/`. Deny everything
+else: dotfiles (`.git`), `includes/`, `cron/`, `scripts/`, `migrations/`, `backups/`, `logs/`,
+`config*` (incl. `config.local.php.bak.*` copies, which PHP would serve as plain text) and
+`*.sql`, `*.gz`, `*.md`. Ideally keep `backup.directory` outside the web root, and send the headers
+`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin` and
+`Strict-Transport-Security`. In production php.ini, set `display_errors = Off` and `expose_php = Off`.
+Check from outside with `curl -I https://<site>/<path>` (expect 403/404).
+
 To roll back, `git reset --hard <previous commit>` in the app directory (and restore the backup
 with `gunzip -c backups/<file>.sql.gz | mysql <db name>` if data was changed; older backups are
 plain `.sql`: `mysql <db name> < backups/<file>.sql`).
@@ -141,11 +151,34 @@ one can brute-force an account:
 - `admin_login_account` — by username, catches one account attacked from many IPs.
 - `otp_verify` — by the pending admin ID, caps guesses against a valid login's OTP code.
 
+## Security notes
+
+- SQL: prepared statements with `bind_param` throughout. The only concatenated SQL is `(int)` casts,
+  whitelisted sort columns/directions, or constant table names.
+- XSS: every user-supplied value is printed with `htmlspecialchars()`.
+- CSRF: every POST handler calls `verifyCsrf()`, including logout, which is a POST button
+  (a GET to `admin/logout.php` just redirects).
+- Session cookie: `HttpOnly`, `SameSite=Lax`, `Secure` over HTTPS, strict mode
+  (`ensureSessionStarted()` in `includes/csrf.php`). Admin sessions expire after 1 hour idle
+  (`ADMIN_IDLE_TIMEOUT_SECONDS` in `includes/auth.php`).
+- OTP: only the newest code is valid; a new login retires earlier unused codes.
+- CSV exports pass data rows through `csvSafe()` (`includes/input.php`), so applicant text starting
+  with `= + - @` can't run as an Excel formula.
+- Registration errors are passed back in the session, never in the URL, so nobody can craft a
+  link that shows their own message on the site.
+- The mailer aborts if STARTTLS fails rather than sending SMTP credentials unencrypted.
+- Backups (emailed as attachments) contain all personal data and admin password hashes. Keep the
+  recipient list to trusted addresses.
+- By design, students identify themselves by student ID + exact name only (no password). Lookup
+  returns a student ID for an exact name, and rate limiting is the main protection.
+
 ## Known simplifications
 
 - The SMTP mailer (`includes/mailer.php`) is a minimal hand-rolled client (OTP and
-  backup emails only, plain-text body with optional attachments). Swap in PHPMailer
-  if you need HTML email.
+  backup emails only, plain-text body with optional attachments; refuses to authenticate if
+  STARTTLS fails). Swap in PHPMailer if you need HTML email.
+- Resetting an admin's password doesn't end that admin's sessions that are already logged in; they
+  expire after the 1-hour idle timeout. Disable the account to cut access immediately.
 - Only the นาย/นาง/นางสาว/อื่นๆ student-ID group has an auto-rollover for batches
   with more than 99 students; พระ and the สิกขมานา/สามเณร/สามเณรี/แม่ชี group fall
   back to manual ID entry in that (unlikely) case — see `DESIGN.md` section 5.

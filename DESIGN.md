@@ -185,7 +185,13 @@ CREATE TABLE app_settings (
 
 ### 4.1 Student registration (`index.php`, `register.php`)
 `index.php` is a landing page — the form is not shown until the visitor clicks "ลงทะเบียน"
-(`?register=1`), so a first-time visit doesn't drop straight into a form. Fields: prefix
+(`?register=1`), so a first-time visit doesn't drop straight into a form. While a batch has
+`registration_open = TRUE`, the visitor's first view of the landing page in a session
+(`$_SESSION['landing_seen']`) pops up the intake poster (`assets/images/landingpage.jpg`) in a modal
+`<dialog>`. Clicking the poster or ลงทะเบียนเลย opens the form; ปิด, Esc or a backdrop click closes it.
+It never appears over the form, an error or the success page. After a successful submit,
+`?success=1` shows the classroom QR code (`assets/images/qr-code7.jpg`) and the foundation's footer
+banner. Fields: prefix
 (dropdown starting on a "-- เลือกคำนำหน้า --" placeholder so the choice is explicit, incl.
 "อื่นๆ (ระบุ)" free-text), name-surname, age, address, province, postal code, mobile phone, LINE
 name, LINE ID, how they heard about the course, new/returning student, previous student ID,
@@ -209,8 +215,10 @@ letters/vowels/tone marks/digits, English letters, digits, spaces, and dashes (`
 in `includes/input.php`); symbols such as `/`, `*`, `&`, `.`, `฿` are rejected. The fields added for
 the Google Form are required only on public registration (`validateStudentFields($raw, true)`); the
 CSV import and admin edit page keep them optional because older students don't have them. On a validation error
-`register.php` stashes the entered values in `$_SESSION['register_old']` and `index.php` refills
-the form once, with a message naming the missing fields. Always targets whichever batch currently has
+`register.php` stashes the entered values in `$_SESSION['register_old']` and the message in
+`$_SESSION['register_error']`, then redirects to `?register=1`. `index.php` refills the form once,
+with a message naming the missing fields. The message is never put in the URL, so a crafted link
+can't show arbitrary text on the site. Always targets whichever batch currently has
 `registration_open = TRUE` at level `จูฬตรี`. Inserted as `status = 'pending'`. Rate-limited.
 Text fields are whitespace-normalized before storage (trimmed, internal runs collapsed to one
 space; see `includes/input.php`), and the same normalization is applied to the name typed at
@@ -257,10 +265,12 @@ spot a typo.
 ## 5. Admin/backend features
 
 OTP login: 6-digit code emailed to the admin's registered email, hashed and stored in
-`otp_codes` with an expiry (e.g. 5 minutes), rate-limited per account. After OTP verification,
-a session is created; every admin page checks that the account still exists and is active
-(`requireAdminLogin()`), then checks `admin_permissions` for the relevant feature number before
-allowing access.
+`otp_codes` with an expiry (e.g. 5 minutes), rate-limited per account. Issuing a code retires the
+account's earlier unused codes, so only the newest is valid. After OTP verification, a session is
+created (with a new session ID). Every admin page checks that the account still exists and is
+active and that the session hasn't been idle for more than 1 hour (`requireAdminLogin()`). It then
+checks `admin_permissions` for the relevant feature number before allowing access. Logout
+(ออกจากระบบ) is a CSRF-protected POST.
 
 The dashboard (`admin/dashboard.php`) lists only the features the admin holds, as a two-column grid
 of cards (one column on screens narrower than 480px), in feature-number order: 0, 1, 2, 3, 4, 6, 7, 9.
@@ -349,7 +359,9 @@ on the rejected view). Changing a filter resets the student selection to all stu
 
 Every view can be exported to CSV (`?export=csv`, carrying the current view, filters, sort and student
 selection) — session-by-session for a single student, the summary table for all students, or the
-rejected list. UTF-8 BOM-prefixed so Thai text renders correctly in Excel.
+rejected list. UTF-8 BOM-prefixed so Thai text renders correctly in Excel. Data rows go through
+`csvSafe()` (`includes/input.php`), which prefixes `'` to any value starting with `= + - @`, so
+applicant free text can't run as a spreadsheet formula.
 
 Known limitation: MySQL's collation doesn't apply Thai leading-vowel ordering (e.g. แม่ชี sorts
 after สามเณร instead of by its consonant ม). Proper Thai collation would need PHP's `intl`
@@ -406,8 +418,22 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
     (a purely IP-based limit can't stop a distributed brute force against a single account).
   - `otp_verify` — keyed by the pending admin ID, caps guesses against a valid login's OTP
     code independent of source IP.
-- Passwords hashed with `password_hash()` (bcrypt); OTP codes hashed at rest, single-use,
-  short-lived.
+- Passwords hashed with `password_hash()` (bcrypt). OTP codes are hashed at rest, single-use and
+  short-lived, and only the newest code per account is valid.
+- **Injection and XSS**: all queries that take input are prepared statements (`bind_param`). The only
+  concatenated SQL is `(int)` casts, whitelisted sort keys/directions, or constant table names.
+  All user data is output through `htmlspecialchars()`.
+- **CSRF**: every POST handler calls `verifyCsrf()` (per-session 32-byte token, `hash_equals`),
+  including logout.
+- **Sessions**: the cookie is `HttpOnly`, `SameSite=Lax` and `Secure` over HTTPS, with
+  `session.use_strict_mode` (`ensureSessionStarted()`). The session ID is regenerated at admin login.
+  Admin sessions expire after `ADMIN_IDLE_TIMEOUT_SECONDS` (1 hour) idle.
+- **CSV exports**: `csvSafe()` neutralises formula-leading values (CSV/Excel injection).
+- **Mail**: the SMTP client aborts instead of authenticating if STARTTLS fails.
+- **Deployment**: the web server serves only the public `.php` entry points and `assets/`. Config
+  (incl. `.bak` copies), `includes/`, `cron/`, `scripts/`, `migrations/`, `backups/`, `.git` and
+  `*.sql/*.md` are denied. `cron/` and `scripts/` also refuse non-CLI execution. See README
+  "Deploying".
 - Admin accounts: a disabled or deleted account is rejected at login and also logged out on
   its next request (`requireAdminLogin()` re-checks `is_active`). Resetting a password deletes the
   account's pending OTP codes. An admin can't disable or delete their own account, so at least one
@@ -461,7 +487,8 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
 │   ├── backup.php
 │   └── clear_expired_otp.php
 └── assets/
-    └── style.css
+    ├── style.css
+    └── images/             (landingpage.jpg intake poster, qr-code7.jpg classroom QR, bottom_banner.jpg)
 ```
 
 ## 8. Confirmed decisions
@@ -547,3 +574,11 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
 - **Backups compressed and emailed** — backups are `.sql.gz` and attached to the email; the
   recipients (several allowed) are edited on the backup page and stored in the new
   `app_settings` table. On an existing database, create it with the one-off SQL in README.md.
+- **Intake poster on the landing page** — while registration is open, the first visit in a
+  session pops up the intake poster, and the success page shows the classroom QR code (section 4.1).
+- **Security review hardening (2026-10)** — a code review found no SQL injection or XSS. It
+  added: CSV formula neutralisation in report exports, registration errors carried in the session
+  instead of `?error=` (which allowed crafted messages), hardened session cookies plus a 1-hour
+  admin idle timeout, POST-only logout, retiring older OTP codes when a new one is issued, and
+  STARTTLS fail-closed in the mailer (section 6). Deferred: ending other sessions when an admin's
+  password is reset (needs a schema change), and encrypting emailed backups.
