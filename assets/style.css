@@ -362,6 +362,11 @@ input[type="radio"] {
     accent-color: var(--primary-dark);
 }
 
+input[type="range"] {
+    padding: 0;
+    accent-color: var(--primary-dark);
+}
+
 input:focus,
 textarea:focus,
 select:focus {

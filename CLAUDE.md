@@ -182,7 +182,9 @@ so a logged-in admin may not have all eight.
 
 `admin/admins.php` (feature 0) is the web equivalent of `scripts/create_admin.php`. It also has a
 per-account panel (`?edit=<id>`) to reset the password (which clears pending OTP codes), enable or
-disable the account, or delete it. Admins can't disable or delete themselves. Deleting is refused
+disable the account, or delete it. Both password forms (create and reset) have an optional
+client-side generator (`crypto.getRandomValues`, 12-50 chars via a slider) that fills and reveals the
+password fields; the server-side checks are unchanged. Admins can't disable or delete themselves. Deleting is refused
 when `promotions.promoted_by` references the account, so the audit trail stays intact. Feature
 permissions can't be edited after creation.
 

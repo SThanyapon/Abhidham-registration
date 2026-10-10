@@ -38,6 +38,22 @@ function passwordError(string $password, string $confirm): ?string
     return null;
 }
 
+// Generator controls for one password form (the script at the bottom of the page wires them up).
+// The range input has no name, so the chosen length is never posted.
+function passwordGeneratorControls(string $prefix): string
+{
+    $id = htmlspecialchars($prefix . '_length');
+
+    return '<label class="checkbox-label"><input type="checkbox" data-pw-generate> ให้ระบบสร้างรหัสผ่านอัตโนมัติ</label>'
+        . '<div data-pw-options hidden>'
+        . '<label for="' . $id . '">ความยาวรหัสผ่าน: <span data-pw-length-value>20</span> ตัวอักษร</label>'
+        . '<input type="range" id="' . $id . '" min="12" max="50" value="20" data-pw-length>'
+        . '<div class="action-row">'
+        . '<button type="button" class="secondary" data-pw-regenerate>สร้างใหม่</button>'
+        . '<button type="button" class="secondary" data-pw-copy>คัดลอก</button>'
+        . '</div></div>';
+}
+
 function findAdmin(mysqli $mysqli, int $id): ?array
 {
     $stmt = $mysqli->prepare('SELECT id, username, email, is_active FROM admin_users WHERE id = ?');
@@ -219,11 +235,15 @@ $admins = $mysqli->query(
         <label for="email">อีเมล (ใช้รับรหัส OTP)<span class="required-mark">*</span></label>
         <input type="email" id="email" name="email" required value="<?= htmlspecialchars($old['email']) ?>">
 
-        <label for="password">รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)<span class="required-mark">*</span></label>
-        <input type="password" id="password" name="password" required minlength="8" autocomplete="new-password">
+        <div class="password-generator">
+            <?= passwordGeneratorControls('password') ?>
 
-        <label for="password_confirm">ยืนยันรหัสผ่าน<span class="required-mark">*</span></label>
-        <input type="password" id="password_confirm" name="password_confirm" required minlength="8" autocomplete="new-password">
+            <label for="password">รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)<span class="required-mark">*</span></label>
+            <input type="password" id="password" name="password" required minlength="8" autocomplete="new-password">
+
+            <label for="password_confirm">ยืนยันรหัสผ่าน<span class="required-mark">*</span></label>
+            <input type="password" id="password_confirm" name="password_confirm" required minlength="8" autocomplete="new-password">
+        </div>
 
         <label>สิทธิ์การใช้งาน<span class="required-mark">*</span></label>
         <div>
@@ -254,10 +274,13 @@ $admins = $mysqli->query(
             <?= csrfField() ?>
             <input type="hidden" name="action" value="reset_password">
             <input type="hidden" name="target_id" value="<?= (int) $editing['id'] ?>">
-            <label for="reset_password">รหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)</label>
-            <input type="password" id="reset_password" name="password" required minlength="8" autocomplete="new-password">
-            <label for="reset_password_confirm">ยืนยันรหัสผ่านใหม่</label>
-            <input type="password" id="reset_password_confirm" name="password_confirm" required minlength="8" autocomplete="new-password">
+            <div class="password-generator">
+                <?= passwordGeneratorControls('reset_password') ?>
+                <label for="reset_password">รหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)</label>
+                <input type="password" id="reset_password" name="password" required minlength="8" autocomplete="new-password">
+                <label for="reset_password_confirm">ยืนยันรหัสผ่านใหม่</label>
+                <input type="password" id="reset_password_confirm" name="password_confirm" required minlength="8" autocomplete="new-password">
+            </div>
             <button type="submit">รีเซ็ตรหัสผ่าน</button>
         </form>
 
@@ -312,5 +335,84 @@ $admins = $mysqli->query(
             <?php endforeach; ?>
         </tbody>
     </table></div>
+
+    <script>
+        // Password generator: fills both password fields of a .password-generator block. Look-alike
+        // characters (0 O o 1 l I) are left out so the password can be read out or retyped safely.
+        const PW_SETS = [
+            'abcdefghijkmnpqrstuvwxyz',
+            'ABCDEFGHJKLMNPQRSTUVWXYZ',
+            '23456789',
+            '!@#$%^&*-_=+?',
+        ];
+        const PW_CHARS = PW_SETS.join('');
+
+        // Uniform random index below n (rejection sampling avoids modulo bias).
+        function randomIndex(n) {
+            const limit = Math.floor(0x100000000 / n) * n;
+            const buf = new Uint32Array(1);
+            do {
+                crypto.getRandomValues(buf);
+            } while (buf[0] >= limit);
+            return buf[0] % n;
+        }
+
+        // Redraw until every character set is represented.
+        function generatePassword(length) {
+            let password;
+            do {
+                password = '';
+                for (let i = 0; i < length; i++) {
+                    password += PW_CHARS[randomIndex(PW_CHARS.length)];
+                }
+            } while (!PW_SETS.every(function (set) {
+                return Array.from(password).some(function (c) { return set.indexOf(c) !== -1; });
+            }));
+            return password;
+        }
+
+        document.querySelectorAll('.password-generator').forEach(function (block) {
+            const toggle = block.querySelector('[data-pw-generate]');
+            const options = block.querySelector('[data-pw-options]');
+            const range = block.querySelector('[data-pw-length]');
+            const lengthValue = block.querySelector('[data-pw-length-value]');
+            const copyButton = block.querySelector('[data-pw-copy]');
+            const fields = block.querySelectorAll('input[name="password"], input[name="password_confirm"]');
+
+            function fill() {
+                const password = generatePassword(parseInt(range.value, 10));
+                lengthValue.textContent = range.value;
+                fields.forEach(function (field) { field.value = password; });
+            }
+
+            toggle.addEventListener('change', function () {
+                const on = toggle.checked;
+                options.hidden = !on;
+                fields.forEach(function (field) {
+                    field.type = on ? 'text' : 'password';
+                    field.readOnly = on;
+                    field.value = '';
+                });
+                if (on) {
+                    fill();
+                }
+            });
+
+            range.addEventListener('input', fill);
+            block.querySelector('[data-pw-regenerate]').addEventListener('click', fill);
+
+            copyButton.addEventListener('click', function () {
+                function copied() {
+                    copyButton.textContent = 'คัดลอกแล้ว';
+                    setTimeout(function () { copyButton.textContent = 'คัดลอก'; }, 1500);
+                }
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(fields[0].value).then(copied, function () { fields[0].select(); });
+                } else {
+                    fields[0].select();
+                }
+            });
+        });
+    </script>
 </body>
 </html>
