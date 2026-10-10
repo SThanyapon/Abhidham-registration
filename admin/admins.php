@@ -39,13 +39,16 @@ function passwordError(string $password, string $confirm): ?string
 }
 
 // Generator controls for one password form (the script at the bottom of the page wires them up).
-// The range input has no name, so the chosen length is never posted.
+// Generating is the default; typing a password requires choosing กำหนดรหัสผ่านเอง. The server ignores
+// the mode and the range input has no name, so only password/password_confirm matter on POST.
 function passwordGeneratorControls(string $prefix): string
 {
     $id = htmlspecialchars($prefix . '_length');
+    $mode = htmlspecialchars($prefix . '_mode');
 
-    return '<label class="checkbox-label"><input type="checkbox" data-pw-generate> ให้ระบบสร้างรหัสผ่านอัตโนมัติ</label>'
-        . '<div data-pw-options hidden>'
+    return '<label class="checkbox-label"><input type="radio" name="' . $mode . '" value="generate" data-pw-mode checked> ให้ระบบสร้างรหัสผ่าน</label>'
+        . '<label class="checkbox-label"><input type="radio" name="' . $mode . '" value="manual" data-pw-mode> กำหนดรหัสผ่านเอง</label>'
+        . '<div data-pw-options>'
         . '<label for="' . $id . '">ความยาวรหัสผ่าน: <span data-pw-length-value>20</span> ตัวอักษร</label>'
         . '<input type="range" id="' . $id . '" min="12" max="50" value="20" data-pw-length>'
         . '<div class="action-row">'
@@ -372,7 +375,7 @@ $admins = $mysqli->query(
         }
 
         document.querySelectorAll('.password-generator').forEach(function (block) {
-            const toggle = block.querySelector('[data-pw-generate]');
+            const modes = block.querySelectorAll('[data-pw-mode]');
             const options = block.querySelector('[data-pw-options]');
             const range = block.querySelector('[data-pw-length]');
             const lengthValue = block.querySelector('[data-pw-length-value]');
@@ -385,18 +388,25 @@ $admins = $mysqli->query(
                 fields.forEach(function (field) { field.value = password; });
             }
 
-            toggle.addEventListener('change', function () {
-                const on = toggle.checked;
-                options.hidden = !on;
+            function applyMode(focusManual) {
+                const generate = block.querySelector('[data-pw-mode]:checked').value === 'generate';
+                options.hidden = !generate;
                 fields.forEach(function (field) {
-                    field.type = on ? 'text' : 'password';
-                    field.readOnly = on;
+                    field.type = generate ? 'text' : 'password';
+                    field.readOnly = generate;
                     field.value = '';
                 });
-                if (on) {
+                if (generate) {
                     fill();
+                } else if (focusManual) {
+                    fields[0].focus();
                 }
+            }
+
+            modes.forEach(function (radio) {
+                radio.addEventListener('change', function () { applyMode(true); });
             });
+            applyMode(false);
 
             range.addEventListener('input', fill);
             block.querySelector('[data-pw-regenerate]').addEventListener('click', fill);
