@@ -28,6 +28,7 @@ mysql -u root -p < schema.sql
 # Existing DBs: apply each new migrations/*.sql once (schema.sql already includes them)
 mysql -u root -p abhidham_registration < migrations/2026-10-registration-fields.sql
 mysql -u root -p abhidham_registration < migrations/2026-10-heard-from-multi.sql
+mysql -u root -p abhidham_registration < migrations/2026-10-address-country.sql
 
 # Create an admin user (feature numbers: 0=manage admins, 1=classes, 2=approvals, 3=reports,
 # 4=promotions, 6=CSV import, 7=edit student, 9=backup; 5 is unused; defaults to all 8)
@@ -129,8 +130,11 @@ up the intake poster (`assets/images/landingpage.jpg`, a `<dialog>`, flagged by
   radio-button questions in `STUDENT_CHOICE_FIELDS` with their `{field}_other` free text, required
   fields, name/age/phone/postal-code rules) and returns `[$clean, $error]`. Shared by `register.php`,
   `admin/import_students.php` and `admin/students.php` so all three enforce identical rules; only
-  `register.php` passes `true`, which makes the Google-Form fields (province, postal code, LINE
-  name/ID, choices, study reason) mandatory — older/imported students lack them. The three callers
+  `register.php` passes `true`, which makes the Google-Form fields (the address parts, LINE
+  name/ID, choices, study reason) mandatory and checks a Thai postcode → จังหวัด → อำเภอ → ตำบล chain
+  against `thaiPostcodes()` (`assets/data/thai_postcodes.json`) — older/imported students lack them.
+  `studentResidence()` decides Thailand (country forced to `COUNTRY_THAILAND`, 5-digit postcode) vs
+  abroad (free-text country/state/city/postcode, no sub-district). The three callers
   build their INSERT/UPDATE from `STUDENT_DETAIL_COLUMNS` + `studentDetailParams()`, so a new
   student field is added in this file (plus the form, schema and a migration). Change validation
   here, not in the callers.
@@ -138,8 +142,10 @@ up the intake poster (`assets/images/landingpage.jpg`, a `<dialog>`, flagged by
   `STUDENT_CHOICE_FIELDS` question as its control type (`radio`, `select`, or `multi` = the
   browser's `<select multiple>` posted as `field[]` and stored comma-joined) with a
   show-on-"อื่นๆ" text box, and shows `previous_student_no` only for a returning student
-  (`index.php`, `admin/students.php`). `provinceFields()` + `provinceScript()` render the
-  `THAI_PROVINCES` dropdown (+ อยู่ต่างประเทศ, which hides the postal code).
+  (`index.php`, `admin/students.php`). `addressFields()` + `addressScript($dataUrl)` render the
+  address block: a Thailand/abroad radio, then a disabled-when-hidden `<fieldset>` per residence
+  (Thailand: postcode first, then จังหวัด/อำเภอ/ตำบล dropdowns filled from the fetched postcode JSON;
+  abroad: free text into the same columns), then the street address.
 
 **UI conventions:** every user-facing string (captions, messages, CSV headers, emails) is Thai, and
 pages use `<html lang="th">` plus the Sarabun Google Font. All styling lives in `assets/style.css`

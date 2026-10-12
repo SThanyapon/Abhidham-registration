@@ -59,7 +59,10 @@ if ($view === 'approved') {
         'line_id' => 'Line ID',
         'line_name' => 'ชื่อไลน์',
         'reference_person' => 'ผู้แนะนำ',
+        'country' => 'ประเทศ',
         'province' => 'จังหวัด',
+        'district' => 'อำเภอ/เขต',
+        'sub_district' => 'ตำบล/แขวง',
         'postal_code' => 'รหัสไปรษณีย์',
         'heard_from' => 'ทราบข่าวจาก',
         'student_type' => 'นักศึกษาเก่า/ใหม่',
@@ -229,7 +232,10 @@ if ($exportCsv) {
                 $r['line_id'] ?: '-',
                 $r['line_name'] ?: '-',
                 $r['reference_person'] ?: '-',
+                $r['country'] ?: '-',
                 $r['province'] ?: '-',
+                $r['district'] ?: '-',
+                $r['sub_district'] ?: '-',
                 $r['postal_code'] ?: '-',
                 studentChoice($r, 'heard_from'),
                 studentChoice($r, 'student_type'),
@@ -381,7 +387,10 @@ $exportHref = 'reports.php?export=csv&view=' . $view . '&sort=' . urlencode($sor
                             <td><?= htmlspecialchars($r['line_id'] ?: '-') ?></td>
                             <td><?= htmlspecialchars($r['line_name'] ?: '-') ?></td>
                             <td><?= htmlspecialchars($r['reference_person'] ?: '-') ?></td>
+                            <td><?= htmlspecialchars($r['country'] ?: '-') ?></td>
                             <td><?= htmlspecialchars($r['province'] ?: '-') ?></td>
+                            <td><?= htmlspecialchars($r['district'] ?: '-') ?></td>
+                            <td><?= htmlspecialchars($r['sub_district'] ?: '-') ?></td>
                             <td><?= htmlspecialchars($r['postal_code'] ?: '-') ?></td>
                             <td><?= htmlspecialchars(studentChoice($r, 'heard_from')) ?></td>
                             <td><?= htmlspecialchars(studentChoice($r, 'student_type')) ?></td>

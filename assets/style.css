@@ -333,6 +333,20 @@ dialog.landing-dialog .action-row {
     display: none;
 }
 
+/* Address panels (includes/student_form.php addressFields()): a borderless <fieldset> per
+   residence, so disabling the hidden one stops its fields being posted */
+.address-panel {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+}
+
+.address-panel[hidden],
+.address-panel [hidden] {
+    display: none;
+}
+
 /* Multi-select list (ทราบข่าวจากช่องทางใด): the browser's own <select multiple>, all options visible */
 select[multiple] {
     padding: 6px;

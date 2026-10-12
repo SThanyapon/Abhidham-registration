@@ -109,7 +109,11 @@ $pending = $mysqli->query(
                 LINE ID: <?= htmlspecialchars($student['line_id'] ?: '-') ?>
             </p>
             <p>
-                ที่อยู่: <?= htmlspecialchars(trim(($student['address'] ?? '') . ' ' . ($student['province'] ?? '') . ' ' . ($student['postal_code'] ?? '')) ?: '-') ?>
+                ที่อยู่: <?= htmlspecialchars(implode(' ', array_filter(
+                    array_map(fn (string $f): string => (string) ($student[$f] ?? ''),
+                        ['address', 'sub_district', 'district', 'province', 'postal_code', 'country']),
+                    fn (string $part): bool => $part !== ''
+                )) ?: '-') ?>
             </p>
             <p>
                 ทราบข่าวจาก: <?= htmlspecialchars(studentChoice($student, 'heard_from')) ?> |

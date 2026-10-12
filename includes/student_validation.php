@@ -4,28 +4,18 @@ require_once __DIR__ . '/input.php';
 
 const STUDENT_PREFIXES = ['พระ', 'สิกขมานา', 'สามเณร', 'สามเณรี', 'แม่ชี', 'นาย', 'นาง', 'นางสาว', 'อื่นๆ'];
 
-// The province dropdown on the registration form: Thailand's 77 provinces (from the provinces.json
-// list the course supplied), then PROVINCE_ABROAD. Kept in Thai alphabetical order by hand - by
-// consonant, with เ/แ/โ/ใ/ไ names filed under the consonant that follows - because PHP's sort()
-// compares bytes and the VM has no intl Collator.
-const THAI_PROVINCES = [
-    'กระบี่', 'กรุงเทพมหานคร', 'กาญจนบุรี', 'กาฬสินธุ์', 'กำแพงเพชร', 'ขอนแก่น', 'จันทบุรี',
-    'ฉะเชิงเทรา', 'ชลบุรี', 'ชัยนาท', 'ชัยภูมิ', 'ชุมพร', 'เชียงราย', 'เชียงใหม่', 'ตรัง', 'ตราด', 'ตาก',
-    'นครนายก', 'นครปฐม', 'นครพนม', 'นครราชสีมา', 'นครศรีธรรมราช', 'นครสวรรค์', 'นนทบุรี', 'นราธิวาส',
-    'น่าน', 'บึงกาฬ', 'บุรีรัมย์', 'ปทุมธานี', 'ประจวบคีรีขันธ์', 'ปราจีนบุรี', 'ปัตตานี',
-    'พระนครศรีอยุธยา', 'พะเยา', 'พังงา', 'พัทลุง', 'พิจิตร', 'พิษณุโลก', 'เพชรบุรี', 'เพชรบูรณ์', 'แพร่',
-    'ภูเก็ต', 'มหาสารคาม', 'มุกดาหาร', 'แม่ฮ่องสอน', 'ยโสธร', 'ยะลา', 'ร้อยเอ็ด', 'ระนอง', 'ระยอง',
-    'ราชบุรี', 'ลพบุรี', 'ลำปาง', 'ลำพูน', 'เลย', 'ศรีสะเกษ', 'สกลนคร', 'สงขลา', 'สตูล', 'สมุทรปราการ',
-    'สมุทรสงคราม', 'สมุทรสาคร', 'สระแก้ว', 'สระบุรี', 'สิงห์บุรี', 'สุโขทัย', 'สุพรรณบุรี',
-    'สุราษฎร์ธานี', 'สุรินทร์', 'หนองคาย', 'หนองบัวลำภู', 'อ่างทอง', 'อำนาจเจริญ', 'อุดรธานี',
-    'อุตรดิตถ์', 'อุทัยธานี', 'อุบลราชธานี',
-];
+// The country stored for a student living in Thailand (the form's default residence).
+const COUNTRY_THAILAND = 'ประเทศไทย';
 
-// Province answer for students living outside Thailand: no Thai postal code applies.
-const PROVINCE_ABROAD = 'อยู่ต่างประเทศ';
+// The form's residence radio: 'th' (postcode lookup) or 'abroad' (free text). Not stored itself;
+// it decides what country holds.
+const RESIDENCE_THAILAND = 'th';
+const RESIDENCE_ABROAD = 'abroad';
 
-// Pre-selected in the registration form's province dropdown.
-const DEFAULT_PROVINCE = 'กรุงเทพมหานคร';
+// Thai postcode => province => district (อำเภอ/เขต) => sub-districts (ตำบล/แขวง), generated from
+// the geography.json the course supplied. Served to the form as a static file and read here to
+// check a registration's address chain.
+const THAI_POSTCODES_FILE = __DIR__ . '/../assets/data/thai_postcodes.json';
 
 // The student_type answer that enables previous_student_no (returning student).
 const STUDENT_TYPE_RETURNING = 'เก่า (เคยเรียนที่วัดศรีสุดาฯ แต่ จะมาเรียนใหม่อีกรอบ)';
@@ -39,7 +29,7 @@ const STUDENT_MULTI_SEPARATOR = ', ';
 // อื่นๆ, whose free text is stored in the matching {field}_other column.
 const STUDENT_CHOICE_FIELDS = [
     'heard_from' => ['ช่องทางที่ทราบข่าว', ['เฟสบุ๊ค', 'กลุ่มไลน์', 'Tiktok (ติ๊กต๊อก)', 'เพื่อนแนะนำ', 'อื่นๆ'], 'multi'],
-    'student_type' => ['นักศึกษาเก่าหรือใหม่', ['ใหม่ (ไม่เคยเรียนกับที่นี่)', STUDENT_TYPE_RETURNING, 'อื่นๆ'], 'select'],
+    'student_type' => ['นักศึกษาเก่าหรือใหม่', ['ใหม่ (ไม่เคยเรียนกับที่นี่)', STUDENT_TYPE_RETURNING, 'อื่นๆ'], 'radio'],
     'zoom_skill' => ['การใช้ ZOOM', ['ใช้เป็น', 'ไม่เป็น', 'อื่นๆ'], 'radio'],
     'joined_classroom' => ['การเข้าห้องเรียน', ['เข้าแล้ว', 'ยังไม่เข้า', 'อื่นๆ'], 'radio'],
 ];
@@ -47,28 +37,59 @@ const STUDENT_CHOICE_FIELDS = [
 // The students columns validateStudentFields() produces, in table order. register.php,
 // admin/import_students.php and admin/students.php build their INSERT/UPDATE from this list.
 const STUDENT_DETAIL_COLUMNS = [
-    'prefix', 'prefix_other', 'full_name', 'age', 'address', 'province', 'postal_code', 'phone',
-    'line_name', 'line_id', 'heard_from', 'heard_from_other', 'student_type', 'student_type_other',
-    'previous_student_no', 'reference_person', 'study_reason', 'zoom_skill', 'zoom_skill_other',
-    'joined_classroom', 'joined_classroom_other',
+    'prefix', 'prefix_other', 'full_name', 'age', 'address', 'country', 'province', 'district',
+    'sub_district', 'postal_code', 'phone', 'line_name', 'line_id', 'heard_from', 'heard_from_other',
+    'student_type', 'student_type_other', 'previous_student_no', 'reference_person', 'study_reason',
+    'zoom_skill', 'zoom_skill_other', 'joined_classroom', 'joined_classroom_other',
 ];
 
 // Optional columns stored as NULL rather than '' when left empty.
 const STUDENT_NULLABLE_FIELDS = [
-    'province', 'postal_code', 'line_name', 'previous_student_no', 'study_reason',
-    'heard_from', 'student_type', 'zoom_skill', 'joined_classroom',
+    'country', 'province', 'district', 'sub_district', 'postal_code', 'line_name',
+    'previous_student_no', 'study_reason', 'heard_from', 'student_type', 'zoom_skill', 'joined_classroom',
 ];
 
+// THAI_POSTCODES_FILE decoded (loaded once per request, only when a check needs it).
+function thaiPostcodes(): array
+{
+    static $data = null;
+    if ($data === null) {
+        $data = json_decode((string) file_get_contents(THAI_POSTCODES_FILE), true) ?: [];
+    }
+
+    return $data;
+}
+
 /**
- * Cleans and validates the registration-form fields (prefix, name, age, address, province, postal
- * code, phone, LINE name/ID, the STUDENT_CHOICE_FIELDS questions, previous student ID, referrer,
- * study reason). Shared by register.php, admin/import_students.php and admin/students.php so all
- * three apply the same rules.
+ * The residence for a set of address values: the form's posted residence radio when valid,
+ * otherwise derived from country (blank or COUNTRY_THAILAND means Thailand), e.g. for a CSV row
+ * or a stored student.
+ */
+function studentResidence(array $values): string
+{
+    $residence = $values['residence'] ?? '';
+    if ($residence === RESIDENCE_THAILAND || $residence === RESIDENCE_ABROAD) {
+        return $residence;
+    }
+    $country = cleanText((string) ($values['country'] ?? ''));
+
+    return $country === '' || $country === COUNTRY_THAILAND ? RESIDENCE_THAILAND : RESIDENCE_ABROAD;
+}
+
+/**
+ * Cleans and validates the registration-form fields (prefix, name, age, address, country /
+ * province / district / sub-district / postal code, phone, LINE name/ID, the STUDENT_CHOICE_FIELDS
+ * questions, previous student ID, referrer, study reason). Shared by register.php,
+ * admin/import_students.php and admin/students.php so all three apply the same rules.
  *
- * $requireRegistrationExtras makes the questions copied from the Google Form (province, postal code,
- * LINE name/ID, the choices, study reason) mandatory. Only register.php sets it: the CSV import and
- * the admin edit page must keep working for students stored before those fields existed, so there
- * they're optional but still format-checked when filled.
+ * The address follows studentResidence(): in Thailand country becomes COUNTRY_THAILAND and the
+ * postcode must be 5 digits; abroad all parts are free text and sub_district is dropped.
+ *
+ * $requireRegistrationExtras makes the questions copied from the Google Form (the address parts,
+ * LINE name/ID, the choices, study reason) mandatory, and checks a Thai postcode -> province ->
+ * district -> sub-district chain against thaiPostcodes(). Only register.php sets it: the CSV import
+ * and the admin edit page must keep working for students stored before those fields existed, so
+ * there they're optional but still format-checked when filled.
  *
  * A choice value that isn't one of its options is treated as อื่นๆ with that value as the free text
  * (so a CSV can carry the answer in one column); a 'multi' answer may be an array (form checkboxes)
@@ -87,8 +108,12 @@ function validateStudentFields(array $raw, bool $requireRegistrationExtras = fal
         'full_name' => cleanText((string) ($raw['full_name'] ?? '')),
         'age' => trim((string) ($raw['age'] ?? '')),
         'address' => cleanMultilineText((string) ($raw['address'] ?? '')),
+        'residence' => studentResidence($raw),
+        'country' => cleanText((string) ($raw['country'] ?? '')),
         'province' => cleanText((string) ($raw['province'] ?? '')),
-        'postal_code' => cleanCode((string) ($raw['postal_code'] ?? '')),
+        'district' => cleanText((string) ($raw['district'] ?? '')),
+        'sub_district' => cleanText((string) ($raw['sub_district'] ?? '')),
+        'postal_code' => cleanText((string) ($raw['postal_code'] ?? '')),
         'phone' => cleanText((string) ($raw['phone'] ?? '')),
         'line_name' => cleanText((string) ($raw['line_name'] ?? '')),
         'line_id' => cleanText((string) ($raw['line_id'] ?? '')),
@@ -141,10 +166,14 @@ function validateStudentFields(array $raw, bool $requireRegistrationExtras = fal
         }
     }
 
-    // A Thai postal code doesn't apply abroad (the form hides the box); the address holds it all.
-    $abroad = $clean['province'] === PROVINCE_ABROAD;
+    // In Thailand the country is fixed and the postcode is digits only; abroad everything is free
+    // text and there is no sub-district box.
+    $abroad = $clean['residence'] === RESIDENCE_ABROAD;
     if ($abroad) {
-        $clean['postal_code'] = '';
+        $clean['sub_district'] = '';
+    } else {
+        $clean['country'] = COUNTRY_THAILAND;
+        $clean['postal_code'] = cleanCode($clean['postal_code']);
     }
 
     // Only a returning student has a previous ID (the form disables the box otherwise).
@@ -167,11 +196,20 @@ function validateStudentFields(array $raw, bool $requireRegistrationExtras = fal
     if ($clean['address'] === '') {
         $missing[] = 'ที่อยู่';
     }
-    if ($requireRegistrationExtras && $clean['province'] === '') {
-        $missing[] = 'จังหวัด';
-    }
-    if ($requireRegistrationExtras && !$abroad && $clean['postal_code'] === '') {
-        $missing[] = 'รหัสไปรษณีย์';
+    if ($requireRegistrationExtras && $abroad) {
+        if ($clean['country'] === '') {
+            $missing[] = 'ประเทศ';
+        }
+        if ($clean['district'] === '') {
+            $missing[] = 'เมือง (City)';
+        }
+    } elseif ($requireRegistrationExtras) {
+        foreach (['postal_code' => 'รหัสไปรษณีย์', 'province' => 'จังหวัด', 'district' => 'อำเภอ/เขต',
+                  'sub_district' => 'ตำบล/แขวง'] as $field => $label) {
+            if ($clean[$field] === '') {
+                $missing[] = $label;
+            }
+        }
     }
     if ($clean['phone'] === '') {
         $missing[] = 'เบอร์มือถือ';
@@ -205,14 +243,22 @@ function validateStudentFields(array $raw, bool $requireRegistrationExtras = fal
         return [$clean, 'กรุณากรอกอายุเป็นตัวเลข 1-120'];
     }
 
-    // Public registration picks from the dropdown; the CSV import and admin edit keep free text
-    // because rows stored before the dropdown existed may hold other spellings.
-    if ($requireRegistrationExtras && !in_array($clean['province'], [...THAI_PROVINCES, PROVINCE_ABROAD], true)) {
-        return [$clean, 'กรุณาเลือกจังหวัดจากรายการ'];
+    if ($abroad) {
+        if ($clean['postal_code'] !== '' && !preg_match('/^[A-Za-z0-9 \-]{1,20}$/', $clean['postal_code'])) {
+            return [$clean, 'รหัสไปรษณีย์ (PostCode) ใช้ได้เฉพาะตัวอักษรอังกฤษ ตัวเลข ขีด และช่องว่าง ไม่เกิน 20 ตัว'];
+        }
+    } elseif ($clean['postal_code'] !== '' && !preg_match('/^[0-9]{5}$/', $clean['postal_code'])) {
+        return [$clean, 'กรุณากรอกรหัสไปรษณีย์เป็นตัวเลข 5 หลัก'];
     }
 
-    if ($clean['postal_code'] !== '' && !preg_match('/^[0-9]{5}$/', $clean['postal_code'])) {
-        return [$clean, 'กรุณากรอกรหัสไปรษณีย์เป็นตัวเลข 5 หลัก'];
+    // Public registration picks จังหวัด/อำเภอ/ตำบล from the postcode's lists, so the chain must
+    // exist. The CSV import and admin edit only format-check: older rows have no อำเภอ/ตำบล and
+    // may hold other spellings.
+    if ($requireRegistrationExtras && !$abroad) {
+        $subDistricts = thaiPostcodes()[$clean['postal_code']][$clean['province']][$clean['district']] ?? null;
+        if (!is_array($subDistricts) || !in_array($clean['sub_district'], $subDistricts, true)) {
+            return [$clean, 'ข้อมูล จังหวัด/อำเภอ/ตำบล ไม่ตรงกับรหัสไปรษณีย์ กรุณาเลือกจากรายการ'];
+        }
     }
 
     // Digits, spaces, '-' and '+' only, with 9-15 digits (Thai landline/mobile, or +66...).

@@ -30,6 +30,9 @@ const IMPORT_COLUMNS = [
     'study_reason' => 'เหตุผลที่มาเรียน',
     'zoom_skill' => 'ใช้ ZOOM เป็นหรือไม่',
     'joined_classroom' => 'เข้าห้องเรียนแล้วหรือยัง',
+    'country' => 'ประเทศ (ว่าง = ประเทศไทย)',
+    'district' => 'อำเภอ/เขต',
+    'sub_district' => 'ตำบล/แขวง',
 ];
 const IMPORT_MAX_BYTES = 2 * 1024 * 1024;
 

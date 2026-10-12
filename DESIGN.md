@@ -72,9 +72,12 @@ CREATE TABLE students (
     prefix_other VARCHAR(100),             -- free text when prefix = "อื่นๆ"
     full_name VARCHAR(255) NOT NULL,       -- Name-Surname (Thai)
     age INT,
-    address TEXT,                          -- mailing address, excluding province / postal code
-    province VARCHAR(100),
-    postal_code VARCHAR(5),
+    address TEXT,                          -- street address, excluding the parts below
+    country VARCHAR(100),                  -- "ประเทศไทย" for residents of Thailand, else free text
+    province VARCHAR(100),                 -- จังหวัด / State
+    district VARCHAR(100),                 -- อำเภอ/เขต / City
+    sub_district VARCHAR(100),             -- ตำบล/แขวง (Thailand only)
+    postal_code VARCHAR(20),               -- 5 digits in Thailand, free text abroad
     phone VARCHAR(50) NOT NULL,            -- mobile
     line_name VARCHAR(255),                -- LINE display name
     line_id VARCHAR(100),                  -- LINE ID or the phone number registered with LINE
@@ -90,7 +93,8 @@ CREATE TABLE students (
     joined_classroom VARCHAR(50),          -- already joined the class room? (choice)
     joined_classroom_other VARCHAR(255),
     -- province .. joined_classroom_other were added by migrations/2026-10-registration-fields.sql
-    -- and are NULL for students registered/imported before then.
+    -- and are NULL for students registered/imported before then. country, district and
+    -- sub_district were added by migrations/2026-10-address-country.sql.
     batch_id INT NOT NULL REFERENCES batches(id),
     current_class_level_id INT REFERENCES class_levels(id),
     status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
@@ -193,22 +197,28 @@ It never appears over the form, an error or the success page. After a successful
 `?success=1` shows the classroom QR code (`assets/images/qr-code7.jpg`) and the foundation's footer
 banner. Fields: prefix
 (dropdown starting on a "-- เลือกคำนำหน้า --" placeholder so the choice is explicit, incl.
-"อื่นๆ (ระบุ)" free-text), name-surname, age, address, province, postal code, mobile phone, LINE
+"อื่นๆ (ระบุ)" free-text), name-surname, age, mailing address (below), mobile phone, LINE
 name, LINE ID, how they heard about the course, new/returning student, previous student ID,
 referring friend, reason for studying, can they use ZOOM, have they joined the class room. The
 fields, their order and their captions mirror the course's Google Form (รุ่น 7); the four
 multiple-choice questions' options and control types live in `STUDENT_CHOICE_FIELDS`
 (`includes/student_validation.php`), each with an "อื่นๆ (ระบุ)" free-text option stored in a
 `{field}_other` column: ทราบข่าวจากช่องทางใด is the browser's multi-select list (pick one or more; stored as
-the picked options joined with ", " in option order), นักศึกษาเก่าหรือใหม่ a single-choice dropdown,
-the ZOOM and joined-classroom questions radio buttons (no fieldset frame). Previous student ID is
+the picked options joined with ", " in option order), and นักศึกษาเก่าหรือใหม่, the ZOOM and
+joined-classroom questions radio buttons (no fieldset frame). Previous student ID is
 hidden (and disabled) unless นักศึกษาเก่าหรือใหม่ is the เก่า option and is discarded server-side otherwise.
-Province is a dropdown of Thailand's 77 provinces (`THAI_PROVINCES`, Thai alphabetical order, default
-กรุงเทพมหานคร) plus "อยู่ต่างประเทศ"; public registration must pick from it, and picking อยู่ต่างประเทศ
-hides the postal code (not required, stored NULL; the address field carries the overseas address).
-The CSV import and admin edit accept other province text so older free-text answers survive. **Required** (marked `*`, enforced client- and server-side): everything
+Mailing address (`addressFields()` in `includes/student_form.php`): first a radio, อยู่ในประเทศไทย
+(default) or อยู่ต่างประเทศ. In Thailand the student types the 5-digit postcode, then picks
+จังหวัด / State, อำเภอ/เขต / City and ตำบล/แขวง from dropdowns offering only that postcode's entries
+(`assets/data/thai_postcodes.json`, postcode → province → district → sub-districts, generated from the
+course's geography.json; some postcodes span two provinces), and country is stored as ประเทศไทย.
+Public registration rejects a chain that isn't in the file. Abroad, Country, State, City and
+PostCode (letters/digits/spaces/dashes, up to 20) are free text stored in the same columns
+(no sub-district); Country and City are required, State and PostCode optional. The free-text street
+address comes last. The CSV import and admin edit only format-check the address parts so older
+answers without อำเภอ/ตำบล survive; a blank country there means Thailand. **Required** (marked `*`, enforced client- and server-side): everything
 except previous student ID and referring friend — prefix (plus the free-text prefix when "อื่นๆ"),
-name-surname, age (integer 1-120), address, province, postal code (5 digits), phone (digits/spaces/
+name-surname, age (integer 1-120), street address, the address parts above, phone (digits/spaces/
 `-`/`+`, 9-15 digits), LINE name, LINE ID, the four choices (plus their free text when "อื่นๆ"),
 reason. Previous student ID, when given, is 4-10 digits. Name-surname may contain only Thai
 letters/vowels/tone marks/digits, English letters, digits, spaces, and dashes (`isValidPersonName()`

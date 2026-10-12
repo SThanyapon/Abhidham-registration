@@ -132,10 +132,7 @@ function choiceField(array $old, string $field, string $caption, bool $required 
             <label for="age">อายุ (โดยประมาณ-ใส่แต่ตัวเลข)<span class="required-mark">*</span></label>
             <input type="number" id="age" name="age" min="1" max="120" required value="<?= oldValue($old, 'age') ?>">
 
-            <label for="address">ที่อยู่ในการส่งเอกสาร (กรอกให้ครบถ้วน ยกเว้น รหัสจังหวัด และ ไปรษณีย์ ให้กรอกในข้อถัดไป)<span class="required-mark">*</span></label>
-            <textarea id="address" name="address" rows="3" required><?= oldValue($old, 'address') ?></textarea>
-
-            <?= provinceFields((string) ($old['province'] ?? DEFAULT_PROVINCE), (string) ($old['postal_code'] ?? ''), true) ?>
+            <?= addressFields($old, true) ?>
 
             <label for="phone">เบอร์มือถือ<span class="required-mark">*</span></label>
             <input type="tel" id="phone" name="phone" inputmode="tel" required
@@ -175,7 +172,7 @@ function choiceField(array $old, string $field, string $caption, bool $required 
         </form>
 
         <?= studentChoiceScript() ?>
-        <?= provinceScript() ?>
+        <?= addressScript('assets/data/thai_postcodes.json') ?>
         <script>
             function togglePrefixOther() {
                 const isOther = document.getElementById('prefix').value === 'อื่นๆ';

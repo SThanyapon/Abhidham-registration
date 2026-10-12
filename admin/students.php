@@ -169,10 +169,7 @@ function adminChoiceField(array $student, string $field, string $caption): strin
             <input type="number" id="age" name="age" min="1" max="120" required
                    value="<?= htmlspecialchars((string) ($student['age'] ?? '')) ?>">
 
-            <label for="address">ที่อยู่ในการส่งเอกสาร<span class="required-mark">*</span></label>
-            <textarea id="address" name="address" rows="3" required><?= htmlspecialchars((string) ($student['address'] ?? '')) ?></textarea>
-
-            <?= provinceFields((string) ($student['province'] ?? ''), (string) ($student['postal_code'] ?? ''), false) ?>
+            <?= addressFields($student, false) ?>
 
             <label for="phone">เบอร์มือถือ<span class="required-mark">*</span></label>
             <input type="tel" id="phone" name="phone" inputmode="tel" required
@@ -214,7 +211,7 @@ function adminChoiceField(array $student, string $field, string $caption): strin
         </form>
 
         <?= studentChoiceScript() ?>
-        <?= provinceScript() ?>
+        <?= addressScript('../assets/data/thai_postcodes.json') ?>
         <script>
             function togglePrefixOther() {
                 const isOther = document.getElementById('prefix').value === 'อื่นๆ';
