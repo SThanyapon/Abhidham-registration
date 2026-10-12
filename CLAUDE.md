@@ -143,9 +143,10 @@ up the intake poster (`assets/images/landingpage.jpg`, a `<dialog>`, flagged by
   browser's `<select multiple>` posted as `field[]` and stored comma-joined) with a
   show-on-"อื่นๆ" text box, and shows `previous_student_no` only for a returning student
   (`index.php`, `admin/students.php`). `addressFields()` + `addressScript($dataUrl)` render the
-  address block: a Thailand/abroad radio, then a disabled-when-hidden `<fieldset>` per residence
-  (Thailand: postcode first, then จังหวัด/อำเภอ/ตำบล dropdowns filled from the fetched postcode JSON;
-  abroad: free text into the same columns), then the street address.
+  address block (Thai captions only): a Thailand/abroad radio, then a disabled-when-hidden
+  `<fieldset>` per residence, each with its own street-address textarea (Thailand: postcode, then
+  จังหวัด/อำเภอ/ตำบล dropdowns filled from the fetched postcode JSON, street address last; abroad:
+  street address, เมือง, รัฐ, รหัสไปรษณีย์, ประเทศ as free text into the same columns).
 
 **UI conventions:** every user-facing string (captions, messages, CSV headers, emails) is Thai, and
 pages use `<html lang="th">` plus the Sarabun Google Font. All styling lives in `assets/style.css`

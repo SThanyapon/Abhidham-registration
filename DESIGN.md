@@ -74,7 +74,7 @@ CREATE TABLE students (
     age INT,
     address TEXT,                          -- street address, excluding the parts below
     country VARCHAR(100),                  -- "ประเทศไทย" for residents of Thailand, else free text
-    province VARCHAR(100),                 -- จังหวัด / State
+    province VARCHAR(100),                 -- จังหวัด (Thailand) / รัฐ (abroad)
     district VARCHAR(100),                 -- อำเภอ/เขต / City
     sub_district VARCHAR(100),             -- ตำบล/แขวง (Thailand only)
     postal_code VARCHAR(20),               -- 5 digits in Thailand, free text abroad
@@ -208,14 +208,15 @@ the picked options joined with ", " in option order), and นักศึกษ�
 joined-classroom questions radio buttons (no fieldset frame). Previous student ID is
 hidden (and disabled) unless นักศึกษาเก่าหรือใหม่ is the เก่า option and is discarded server-side otherwise.
 Mailing address (`addressFields()` in `includes/student_form.php`): first a radio, อยู่ในประเทศไทย
-(default) or อยู่ต่างประเทศ. In Thailand the student types the 5-digit postcode, then picks
-จังหวัด / State, อำเภอ/เขต / City and ตำบล/แขวง from dropdowns offering only that postcode's entries
+(default) or อยู่ต่างประเทศ; captions are Thai only. In Thailand the student types the 5-digit
+postcode, then picks จังหวัด, อำเภอ/เขต and ตำบล/แขวง from dropdowns offering only that postcode's entries
 (`assets/data/thai_postcodes.json`, postcode → province → district → sub-districts, generated from the
-course's geography.json; some postcodes span two provinces), and country is stored as ประเทศไทย.
-Public registration rejects a chain that isn't in the file. Abroad, Country, State, City and
-PostCode (letters/digits/spaces/dashes, up to 20) are free text stored in the same columns
-(no sub-district); Country and City are required, State and PostCode optional. The free-text street
-address comes last. The CSV import and admin edit only format-check the address parts so older
+course's geography.json; some postcodes span two provinces), then types the street address last;
+country is stored as ประเทศไทย. Public registration rejects a chain that isn't in the file. Abroad
+the order is ที่อยู่ (street address), เมือง (→ district), รัฐ (→ province), รหัสไปรษณีย์
+(letters/digits/spaces/dashes, up to 20), ประเทศ, all free text stored in the same columns (no
+sub-district); street address, เมือง and ประเทศ are required, รัฐ and รหัสไปรษณีย์ optional. Each
+panel has its own street-address box, so the order can differ. The CSV import and admin edit only format-check the address parts so older
 answers without อำเภอ/ตำบล survive; a blank country there means Thailand. **Required** (marked `*`, enforced client- and server-side): everything
 except previous student ID and referring friend — prefix (plus the free-text prefix when "อื่นๆ"),
 name-surname, age (integer 1-120), street address, the address parts above, phone (digits/spaces/

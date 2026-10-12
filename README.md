@@ -129,6 +129,14 @@ Substitute your own domain, paths and PHP version.
    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
    include fastcgi_params;
    ```
+   Ubuntu's `nginx.conf` turns `gzip on` but compresses only HTML. To also compress the text assets
+   (the registration form's postcode lookup `assets/data/thai_postcodes.json` is ~257 KB, ~51 KB
+   gzipped), add `/etc/nginx/conf.d/gzip-assets.conf`:
+   ```nginx
+   gzip_types application/json text/css application/javascript text/javascript;
+   gzip_vary on;
+   gzip_comp_level 6;
+   ```
    **A new top-level public `.php` page must be added to the regex**, or it will return 404.
    Run `sudo nginx -t && sudo systemctl reload nginx` after any change.
 7. **HTTPS**: `sudo certbot --nginx -d <your domain>`. Certbot adds the `listen 443 ssl` and

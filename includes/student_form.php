@@ -53,12 +53,14 @@ function studentChoiceField(string $field, string $caption, string $value, strin
 }
 
 /**
- * HTML for the mailing-address block, in fill-in order: the residence radio (อยู่ในประเทศไทย, the
- * default, or อยู่ต่างประเทศ), then that residence's panel, then the free-text street address.
+ * HTML for the mailing-address block: the residence radio (อยู่ในประเทศไทย, the default, or
+ * อยู่ต่างประเทศ), then that residence's panel, each with its own street-address box and field
+ * order. Captions are Thai only.
  * - Thailand: รหัสไปรษณีย์ first, then จังหวัด / อำเภอ / ตำบล dropdowns that addressScript() fills
- *   with only that postcode's entries from THAI_POSTCODES_FILE. The stored values are rendered as
- *   the selected options so a refill or a legacy row shows before (or without) the script.
- * - Abroad: free-text Country, State, City and PostCode, stored in the same columns.
+ *   with only that postcode's entries from THAI_POSTCODES_FILE, then the street address. The stored
+ *   values are rendered as the selected options so a refill or a legacy row shows before (or
+ *   without) the script.
+ * - Abroad: free-text street address, city, state, postcode and country, stored in the same columns.
  * The hidden panel is a disabled <fieldset>, so its same-named controls are neither posted nor
  * validated. $values holds the stored or refilled student fields (studentResidence() picks the
  * panel). Shared by index.php and admin/students.php; the page must also output addressScript().
@@ -82,6 +84,12 @@ function addressFields(array $values, bool $required): string
             . '</select>';
     };
 
+    // The street address is always required (validateStudentFields() checks it on every page).
+    $street = fn (string $id, string $caption, string $text): string =>
+        '<label for="' . $id . '">' . $caption . '<span class="required-mark">*</span></label>'
+        . '<textarea id="' . $id . '" name="address" rows="3" required autocomplete="street-address">'
+        . $text . '</textarea>';
+
     $radio = fn (string $value, string $label, bool $checked): string =>
         '<label class="checkbox-label"><input type="radio" name="residence" value="' . $value . '"'
         . ($checked ? ' checked' : '') . ' onchange="syncResidence()"> ' . $label . '</label>';
@@ -89,39 +97,38 @@ function addressFields(array $values, bool $required): string
     return '<div class="field-group choice-field">'
         . '<label>ที่อยู่ในการส่งเอกสาร: ท่านพักอาศัยอยู่ที่ใด?' . $mark . '</label>'
         . $radio(RESIDENCE_THAILAND, 'อยู่ในประเทศไทย', !$abroad)
-        . $radio(RESIDENCE_ABROAD, 'อยู่ต่างประเทศ (Living abroad)', $abroad)
+        . $radio(RESIDENCE_ABROAD, 'อยู่ต่างประเทศ', $abroad)
         . '</div>'
 
         . '<fieldset id="address_th" class="field-group address-panel"' . ($abroad ? ' hidden disabled' : '') . '>'
-        . '<label for="postal_code_th">รหัสไปรษณีย์ / PostCode' . $mark . '</label>'
+        . '<label for="postal_code_th">รหัสไปรษณีย์' . $mark . '</label>'
         . '<p class="form-note">กรอกรหัสไปรษณีย์ก่อน แล้วเลือก จังหวัด อำเภอ ตำบล จากรายการ</p>'
         . '<input type="text" id="postal_code_th" name="postal_code" inputmode="numeric" maxlength="5"'
         . ' pattern="[0-9]{5}" title="ตัวเลข 5 หลัก" autocomplete="postal-code"' . $req
         . ' value="' . $th('postal_code') . '" oninput="syncThaiAddress(false)">'
         . '<p id="postal_code_unknown" class="error" hidden>ไม่พบรหัสไปรษณีย์นี้ กรุณาตรวจสอบอีกครั้ง</p>'
-        . $select('province', 'จังหวัด / State')
-        . $select('district', 'อำเภอ/เขต / City')
+        . $select('province', 'จังหวัด')
+        . $select('district', 'อำเภอ/เขต')
         . $select('sub_district', 'ตำบล/แขวง')
+        . $street('street_address_th', 'ที่อยู่ (บ้านเลขที่ หมู่บ้าน ซอย ถนน)', $th('address'))
         . '</fieldset>'
 
         . '<fieldset id="address_abroad" class="field-group address-panel"' . ($abroad ? '' : ' hidden disabled') . '>'
-        . '<label for="country_abroad">ประเทศ / Country' . $mark . '</label>'
-        . '<input type="text" id="country_abroad" name="country" autocomplete="country-name"' . $req
-        . ' value="' . $away('country') . '">'
-        . '<label for="province_abroad">รัฐ/จังหวัด / State</label>'
-        . '<input type="text" id="province_abroad" name="province" value="' . $away('province') . '">'
-        . '<label for="district_abroad">เมือง / City' . $mark . '</label>'
+        . $street('street_address_abroad', 'ที่อยู่', $away('address'))
+        . '<label for="district_abroad">เมือง' . $mark . '</label>'
         . '<input type="text" id="district_abroad" name="district" autocomplete="address-level2"' . $req
         . ' value="' . $away('district') . '">'
-        . '<label for="postal_code_abroad">รหัสไปรษณีย์ / PostCode</label>'
+        . '<label for="province_abroad">รัฐ</label>'
+        . '<input type="text" id="province_abroad" name="province" autocomplete="address-level1"'
+        . ' value="' . $away('province') . '">'
+        . '<label for="postal_code_abroad">รหัสไปรษณีย์</label>'
         . '<input type="text" id="postal_code_abroad" name="postal_code" maxlength="20" autocomplete="postal-code"'
         . ' pattern="[A-Za-z0-9 \-]{1,20}" title="ตัวอักษรอังกฤษ ตัวเลข ขีด และช่องว่าง ไม่เกิน 20 ตัว"'
         . ' value="' . $away('postal_code') . '">'
-        . '</fieldset>'
-
-        . '<label for="address">ที่อยู่ / Street address (บ้านเลขที่ หมู่บ้าน ซอย ถนน)<span class="required-mark">*</span></label>'
-        . '<textarea id="address" name="address" rows="3" required autocomplete="street-address">'
-        . $value('address') . '</textarea>';
+        . '<label for="country_abroad">ประเทศ' . $mark . '</label>'
+        . '<input type="text" id="country_abroad" name="country" autocomplete="country-name"' . $req
+        . ' value="' . $away('country') . '">'
+        . '</fieldset>';
 }
 
 /**

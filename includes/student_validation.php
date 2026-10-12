@@ -197,11 +197,11 @@ function validateStudentFields(array $raw, bool $requireRegistrationExtras = fal
         $missing[] = 'ที่อยู่';
     }
     if ($requireRegistrationExtras && $abroad) {
+        if ($clean['district'] === '') {
+            $missing[] = 'เมือง';
+        }
         if ($clean['country'] === '') {
             $missing[] = 'ประเทศ';
-        }
-        if ($clean['district'] === '') {
-            $missing[] = 'เมือง (City)';
         }
     } elseif ($requireRegistrationExtras) {
         foreach (['postal_code' => 'รหัสไปรษณีย์', 'province' => 'จังหวัด', 'district' => 'อำเภอ/เขต',
@@ -245,7 +245,7 @@ function validateStudentFields(array $raw, bool $requireRegistrationExtras = fal
 
     if ($abroad) {
         if ($clean['postal_code'] !== '' && !preg_match('/^[A-Za-z0-9 \-]{1,20}$/', $clean['postal_code'])) {
-            return [$clean, 'รหัสไปรษณีย์ (PostCode) ใช้ได้เฉพาะตัวอักษรอังกฤษ ตัวเลข ขีด และช่องว่าง ไม่เกิน 20 ตัว'];
+            return [$clean, 'รหัสไปรษณีย์ ใช้ได้เฉพาะตัวอักษรอังกฤษ ตัวเลข ขีด และช่องว่าง ไม่เกิน 20 ตัว'];
         }
     } elseif ($clean['postal_code'] !== '' && !preg_match('/^[0-9]{5}$/', $clean['postal_code'])) {
         return [$clean, 'กรุณากรอกรหัสไปรษณีย์เป็นตัวเลข 5 หลัก'];
