@@ -288,9 +288,11 @@ one can brute-force an account:
   อำเภอ/เขต, ตำบล/แขวง) means Thailand. Imported addresses are only format-checked, not matched
   against the postcode list.
 - The registration form's Thai address lookup (`assets/data/thai_postcodes.json`, postcode →
-  จังหวัด → อำเภอ → ตำบล) is a static snapshot generated from the course's `geography.json`. To
-  update it, regenerate the file in the same nested shape and redeploy. Public registration rejects
-  any combination that isn't in it.
+  จังหวัด → อำเภอ → ตำบล) is a static snapshot generated from `geography.json` of
+  [thailand-geography-json](https://github.com/thailand-geography-data/thailand-geography-json)
+  (Thai postcodes, provinces, districts and sub-districts). To update it, download a newer
+  `geography.json` from there, regenerate the file in the same nested shape and redeploy. Public
+  registration rejects any combination that isn't in it.
 - Sorting Thai names/prefixes in the admin report uses MySQL's collation, which doesn't apply Thai
   leading-vowel ordering (e.g. แม่ชี sorts after สามเณร). Proper Thai sorting would need PHP's
   `intl` extension.
