@@ -40,8 +40,9 @@ original requirements.
    ```
 5. Open `http://localhost:8000`:
    - `/` — landing page; click "ลงทะเบียน" (Register) (or visit `/?register=1`) to open the
-     registration form. While a batch's registration is open, the first visit in a browser session
-     pops up the intake poster (`assets/images/landingpage.jpg`); after submitting, the page shows
+     registration form (in Thailand the address starts with the postcode, which narrows the
+     จังหวัด/อำเภอ/ตำบล dropdowns; abroad it's free text). While a batch's registration is
+     open, the first visit in a browser session pops up the intake poster (`assets/images/landingpage.jpg`); after submitting, the page shows
      the classroom QR code (`assets/images/qr-code7.jpg`). Replace those images for a new intake.
    - `/checkin.php` — "ลงชื่อ/ตรวจสอบการเข้าเรียน": student ID + name, then pick a class (each
      batch's current, highest class) and a session dated today or earlier to check in, or leave
@@ -280,9 +281,16 @@ one can brute-force an account:
 - An admin who has promoted students can't be deleted (`promotions.promoted_by` keeps that
   history); disable the account instead.
 - The CSV import reads columns by position, not by header name, and always skips the first row,
-  so keep the template's column order. Columns from "จังหวัด" onward are optional, so files made
-  from the older 9-column template still import. "ทราบข่าวจากช่องทางใด" may list several options
-  separated by commas; "รหัสนักศึกษาเดิม" is kept only when "นักศึกษาเก่าหรือใหม่" is the เก่า option.
+  so keep the template's column order. Columns from "จังหวัด" onward are optional and new ones are
+  only ever appended, so files made from an older, shorter template still import. "ทราบข่าวจากช่องทางใด"
+  may list several options separated by commas; "รหัสนักศึกษาเดิม" is kept only when
+  "นักศึกษาเก่าหรือใหม่" is the เก่า option. A blank "ประเทศ" (the last columns are ประเทศ,
+  อำเภอ/เขต, ตำบล/แขวง) means Thailand. Imported addresses are only format-checked, not matched
+  against the postcode list.
+- The registration form's Thai address lookup (`assets/data/thai_postcodes.json`, postcode →
+  จังหวัด → อำเภอ → ตำบล) is a static snapshot generated from the course's `geography.json`. To
+  update it, regenerate the file in the same nested shape and redeploy. Public registration rejects
+  any combination that isn't in it.
 - Sorting Thai names/prefixes in the admin report uses MySQL's collation, which doesn't apply Thai
   leading-vowel ordering (e.g. แม่ชี sorts after สามเณร). Proper Thai sorting would need PHP's
   `intl` extension.

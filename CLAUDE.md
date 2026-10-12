@@ -156,7 +156,9 @@ colours should be added as tokens rather than hard-coded); reuse its classes rat
 `.error` / `.success` / `.notice` (red / green / amber alerts), `.card`, `.table-wrap` (wrap every
 `<table>` for mobile scrolling), `.required-mark` + `.form-note` (red `*` on required fields),
 `.inline-form` / `.action-row` / `.checkbox-label` (compact forms), `.sort-link` (clickable table
-headers), `.view-toggle` (pill switch between views), `.field-group`, `button.danger` /
+headers), `.view-toggle` (pill switch between views), `.field-group`, `.choice-field` (a
+`studentChoiceField()` question), `.address-panel` (borderless `<fieldset>` per address
+residence), `button.danger` /
 `button.secondary`, `.feature-links` (the dashboard's two-column card grid, one column under
 480px), and the nav classes
 `.nav-admin` (public pages' ผู้ดูแลระบบ link, right-aligned, orange) and `.nav-logout` (admin
@@ -191,7 +193,8 @@ so a logged-in admin may not have all eight.
 per-account panel (`?edit=<id>`) to reset the password (which clears pending OTP codes), enable or
 disable the account, or delete it. Both password forms (create and reset) default to a
 client-side generated password (`crypto.getRandomValues`, 12-50 chars via a slider) shown in the
-password fields; typing one requires choosing กำหนดรหัสผ่านเอง. The server-side checks are unchanged. Admins can't disable or delete themselves. Deleting is refused
+password fields; typing one requires choosing กำหนดรหัสผ่านเอง. The server-side checks are
+unchanged. Admins can't disable or delete themselves. Deleting is refused
 when `promotions.promoted_by` references the account, so the audit trail stays intact. Feature
 permissions can't be edited after creation.
 
@@ -206,8 +209,11 @@ registration only for the latest batch (highest `batch_no`, also enforced in the
 a starting level the admin chooses. Batches are never auto-created: if any row references a batch
 that doesn't exist, the whole file is refused (nothing imported) and the missing batch numbers listed.
 `noteImportedStudentNo()` bumps `student_id_sequences`. Invalid rows are skipped and reported, not
-fatal. `admin/students.php` (feature 7) looks a student up by exact ID + name and edits their
-contact details; student ID, batch, level and status are read-only there.
+fatal. Columns are read by position (`IMPORT_COLUMNS`), so new columns are only ever appended to
+the end (the latest are ประเทศ, อำเภอ/เขต, ตำบล/แขวง; a blank country means Thailand) and older,
+shorter files keep importing. `admin/students.php` (feature 7) looks a student up by exact ID +
+name and edits every registration-form field (same `addressFields()` block, lenient validation);
+student ID, batch, level and status are read-only there.
 
 `admin/reports.php` (feature 3) reuses `includes/attendance.php`'s `getAttendanceSummary()` to show
 per-session attendance for one selected student or a summary table for every approved student, with
@@ -216,7 +222,8 @@ summary table sorts by clickable column headers (`?sort=student_no|prefix|full_n
 + `&dir=asc|desc`, whitelisted; default `student_no` ascending, ordered by length then value so
 IDs sort numerically). Stored columns sort in SQL; the computed attendance columns sort in PHP, and
 the CSV export follows the same order. A `?view=approved|rejected` toggle (default `approved`)
-switches to a list of rejected applicants (contact details + application date, sortable by
+switches to a list of rejected applicants (contact details, address parts other than the street
+address, the form answers and the application date, sortable by
 prefix/name/batch/date, newest first by default, with its own CSV export); rejected rows have no
 `student_no` or level, so that view skips the `class_levels` join. Optional filters `?batch_id=`
 (both views) and `?level_id=` (current level, approved view only) narrow the table, the student

@@ -75,7 +75,7 @@ CREATE TABLE students (
     address TEXT,                          -- street address, excluding the parts below
     country VARCHAR(100),                  -- "ประเทศไทย" for residents of Thailand, else free text
     province VARCHAR(100),                 -- จังหวัด (Thailand) / รัฐ (abroad)
-    district VARCHAR(100),                 -- อำเภอ/เขต / City
+    district VARCHAR(100),                 -- อำเภอ/เขต (Thailand) / เมือง (abroad)
     sub_district VARCHAR(100),             -- ตำบล/แขวง (Thailand only)
     postal_code VARCHAR(20),               -- 5 digits in Thailand, free text abroad
     phone VARCHAR(50) NOT NULL,            -- mobile
@@ -299,6 +299,12 @@ existing admins with their features. Each listed admin has a จัดการ 
   when the admin has `promotions` history (`promoted_by` is a NOT NULL audit trail), and the admin is
   told to disable the account instead.
 
+Both password forms (create and reset) default to ให้ระบบสร้างรหัสผ่าน: a password generated in the
+browser (`crypto.getRandomValues`, 20 characters by default, 12-50 via a slider, skipping
+look-alike characters `0 O o 1 l I`) fills both password fields, with สร้างใหม่ (regenerate) and
+คัดลอก (copy) buttons. Typing a password requires choosing กำหนดรหัสผ่านเอง. The server only sees
+the two password fields and applies the same ≥ 8 chars check either way.
+
 An admin can't disable or delete their own account, but can reset their own password. The acting
 admin is always active and holds feature 0, so at least one admin who can manage accounts always
 remains. Changing an existing admin's feature permissions isn't supported.
@@ -318,7 +324,12 @@ remains. Changing an existing admin's feature permissions isn't supported.
   grey row background for quick scanning.
 
 ### Feature 2 — Approve enrollment
-List `pending` students; on approval, generate `student_no` as `{batch_no}{group_digit}{seq}`,
+`admin/approvals.php`. Lists `pending` students with everything they entered on the registration
+form: prefix and name, batch, age, phone, LINE name and ID, the full address (street address,
+ตำบล, อำเภอ, จังหวัด, postcode and country, blanks skipped), the choice answers, previous student
+ID, referrer and study reason. Each has อนุมัติ (approve; an optional override box takes a manual
+student ID) and ไม่อนุมัติ (reject, which sets `status = 'rejected'`). Approval sets the level to
+`จูฬตรี`. Without an override, it generates `student_no` as `{batch_no}{group_digit}{seq}`,
 where `seq` is **always 2 digits** (`01`-`99`). Total length is therefore 4 digits for a
 single-digit batch (e.g. รุ่น 7) and 5 digits for a two-digit batch (e.g. รุ่น 10).
 
@@ -359,8 +370,9 @@ all approved students at once:
   columns sort in PHP. The student dropdown uses the same order.
 
 **ผู้สมัครที่ไม่ได้รับการอนุมัติ (rejected)** — every `status = 'rejected'` registration with
-คำนำหน้า, ชื่อ-นามสกุล, รุ่น, อายุ, เบอร์โทรศัพท์, Line ID, ผู้แนะนำ and วันที่สมัคร (BE short
-date). Sortable by prefix/name/batch/date, newest first by default. Rejected rows have no
+คำนำหน้า, ชื่อ-นามสกุล, รุ่น, อายุ, เบอร์โทรศัพท์, Line ID, ชื่อไลน์, ผู้แนะนำ, ประเทศ, จังหวัด,
+อำเภอ/เขต, ตำบล/แขวง, รหัสไปรษณีย์, the choice answers, รหัสนักศึกษาเดิม, เหตุผลที่มาเรียน and
+วันที่สมัคร (BE short date). Sortable by prefix/name/batch/date, newest first by default. Rejected rows have no
 `student_no` or `current_class_level_id`, so this view queries without the `class_levels` join.
 
 **Filters** — a รุ่น dropdown (both views) and a ระดับชั้น dropdown (current level; approved view
@@ -385,8 +397,15 @@ in `class_levels.sort_order`; every promotion is logged in `promotions`.
 
 ### Feature 6 — Import students from CSV
 `admin/import_students.php`. Upload a CSV (≤ 2 MB, header row first; a template is downloadable
-via `?template=1`) with the registration-form columns plus student ID, in this order:
-รหัสนักศึกษา, คำนำหน้า, ระบุคำนำหน้า, ชื่อ-นามสกุล, อายุ, ที่อยู่, เบอร์โทรศัพท์, Line ID, ผู้แนะนำ.
+via `?template=1`) with the registration-form columns plus student ID, read **by position** in
+this order (`IMPORT_COLUMNS` in `admin/import_students.php`): รหัสนักศึกษา, คำนำหน้า, ระบุคำนำหน้า,
+ชื่อ-นามสกุล, อายุ, ที่อยู่, เบอร์โทรศัพท์, Line ID, ผู้แนะนำ, then the optional later additions
+จังหวัด, รหัสไปรษณีย์, ชื่อไลน์, ทราบข่าวจากช่องทางใด, นักศึกษาเก่าหรือใหม่, รหัสนักศึกษาเดิม,
+เหตุผลที่มาเรียน, ใช้ ZOOM เป็นหรือไม่, เข้าห้องเรียนแล้วหรือยัง, ประเทศ, อำเภอ/เขต, ตำบล/แขวง.
+New columns are only ever appended, so files made from an older, shorter template still import.
+A choice column holds one of its options or free text (stored as อื่นๆ + that text);
+ทราบข่าวจากช่องทางใด may list several options separated by commas. A blank ประเทศ means Thailand
+(stored as ประเทศไทย). The address parts are only format-checked (no postcode lookup).
 UTF-8 (with or without BOM) and Windows-874 files are both accepted.
 - Imported students are inserted directly as `approved` with the student ID from the file — no
   approval step.
@@ -406,8 +425,13 @@ UTF-8 (with or without BOM) and Windows-874 files are both accepted.
 
 ### Feature 7 — Edit student details
 `admin/students.php`. The admin enters a student ID **and** full name (both must match exactly),
-then can edit prefix, name, age, address, phone, Line ID and referrer, with the same validation as
-registration. Student ID, batch, level and status are not editable here. A new name may not clash
+then can edit every registration-form field (prefix, name, age, the address block of section 4.1,
+phone, LINE name and ID, the choice questions, previous student ID, referrer and study reason) with
+the same validation as registration. The Google-Form questions are optional here and the address is
+only format-checked, so older students who lack them can still be saved. The address block opens on
+the student's stored residence (blank or ประเทศไทย country means Thailand) and keeps a stored
+จังหวัด/อำเภอ/ตำบล that isn't in the postcode list. Student ID, batch, level and status are not
+editable here. A new name may not clash
 with another approved/pending student, because check-in and lookup match on exact name.
 
 ### Feature 9 — Backup
@@ -462,7 +486,8 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
 /
 ├── config.local.php.example
 ├── config.php
-├── schema.sql
+├── schema.sql           -> full schema for a fresh install (includes every migration)
+├── migrations/          -> one-off ALTERs for existing databases, applied once in name order
 ├── index.php            -> landing page + registration form
 ├── register.php         -> registration POST handler (validation, insert as pending)
 ├── checkin.php          -> check-in / view attendance progress
@@ -479,6 +504,7 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
 │   ├── backup.php          (runBackup())
 │   ├── input.php           (whitespace cleanup + name validation for user input)
 │   ├── student_validation.php (validateStudentFields(), shared by register/import/edit)
+│   ├── student_form.php    (studentChoiceField(), addressFields() + their scripts)
 │   ├── student_helpers.php (studentPrefix(), studentClassInstanceId())
 │   └── date_helpers.php    (formatDateBEShort())
 ├── scripts/
@@ -487,6 +513,7 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
 ├── admin/
 │   ├── login.php
 │   ├── verify_otp.php
+│   ├── logout.php          (POST only)
 │   ├── dashboard.php
 │   ├── admins.php         (feature 0)
 │   ├── classes.php        (feature 1)
@@ -501,6 +528,8 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
 │   └── clear_expired_otp.php
 └── assets/
     ├── style.css
+    ├── data/
+    │   └── thai_postcodes.json (postcode → จังหวัด → อำเภอ → ตำบล, for the registration address)
     └── images/             (landingpage.jpg intake poster, qr-code7.jpg classroom QR, bottom_banner.jpg)
 ```
 
@@ -595,3 +624,16 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
   admin idle timeout, POST-only logout, retiring older OTP codes when a new one is issued, and
   STARTTLS fail-closed in the mailer (section 6). Deferred: ending other sessions when an admin's
   password is reset (needs a schema change), and encrypting emailed backups.
+- **Registration form mirrors the Google Form (รุ่น 7)** — added LINE name, the four choice
+  questions with "อื่นๆ (ระบุ)" free text, previous student ID and study reason
+  (`migrations/2026-10-registration-fields.sql`). They're required on public registration only, so
+  older and imported students stay valid. ทราบข่าวจากช่องทางใด later became a multi-select
+  (`migrations/2026-10-heard-from-multi.sql`). นักศึกษาเก่าหรือใหม่ went from a dropdown to radio buttons.
+- **Address by postcode, or abroad (2026-10)** — the province dropdown (77 provinces +
+  อยู่ต่างประเทศ) was replaced by the address block in section 4.1: a Thailand/abroad choice,
+  postcode-driven จังหวัด/อำเภอ/ตำบล dropdowns checked server-side, and free text abroad. New
+  columns country, district and sub_district, with postal_code widened to 20 characters
+  (`migrations/2026-10-address-country.sql`). That migration set country = ประเทศไทย on rows with
+  a Thai province and cleared the old อยู่ต่างประเทศ province value. Captions are Thai only.
+- **Generated admin passwords** — admin create/reset forms default to a browser-generated
+  password (Feature 0, section 5) instead of asking the admin to invent one.
