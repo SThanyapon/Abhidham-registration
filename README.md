@@ -9,7 +9,9 @@ original requirements.
 ## Requirements
 
 - PHP 8.0+ (the codebase uses `match` expressions and typed properties). The production VM
-  runs PHP 8.5.
+  runs PHP 8.5. In production, use at least 8.5.12 / 8.4.27 / 8.3.36 / 8.2.35. Older releases
+  are open to the PHP2Shell remote code execution bugs (CVE-2026-109618, CVE-2026-109619), and
+  PHP 8.1 and older get no fix.
 - MySQL/MariaDB with the `mysqli` extension.
 - PHP extensions `mbstring`, `zlib` (gzip backups) and `openssl` (SMTP over TLS/SSL).
 - The `iconv` extension (bundled with most PHP builds) for importing CSV files saved in Windows-874
@@ -77,7 +79,9 @@ The steps below match the production VM (Ubuntu, nginx, PHP-FPM, MySQL, app at `
 Substitute your own domain, paths and PHP version.
 
 1. **Packages**: nginx, MySQL server, `php-fpm` and `php-mysql php-mbstring` (zlib, openssl and
-   iconv are built in on Ubuntu's PHP), git, and certbot with its nginx plugin.
+   iconv are built in on Ubuntu's PHP), git, and certbot with its nginx plugin. Install only one
+   PHP version, and remove any other `phpX.Y-*`/`libapache2-mod-php*` packages and Apache. An idle
+   second PHP-FPM still has to be patched.
 2. **Code**: clone the repo to `/opt/abhidham`, owned by `www-data` and closed to other users:
    ```
    sudo git clone <repo url> /opt/abhidham
@@ -143,8 +147,12 @@ Substitute your own domain, paths and PHP version.
 7. **HTTPS**: `sudo certbot --nginx -d <your domain>`. Certbot adds the `listen 443 ssl` and
    certificate lines plus the HTTP-to-HTTPS redirect. HTTPS is required: the session cookie is
    only marked `Secure` over HTTPS, and HSTS is sent.
-8. **PHP settings** (FPM `php.ini`): `display_errors = Off`, `log_errors = On`, `expose_php = Off`.
-   Then restart PHP-FPM.
+8. **PHP settings**: `display_errors = Off`, `log_errors = On`, `expose_php = Off`, and
+   `session.upload_progress.enabled = 0`. The app never uses upload progress, and turning it off
+   closes the session path of CVE-2026-109619. The VM keeps these in
+   `/etc/php/8.5/mods-available/abhidham-hardening.ini` (first line `; priority=99`), enabled with
+   `sudo phpenmod -v 8.5 abhidham-hardening`. Then restart PHP-FPM. Keep the PHP packages
+   patched (`sudo apt-get update && sudo apt-get upgrade`, then restart PHP-FPM).
 9. **Scheduled jobs** (`sudo crontab -u www-data -e`). Output goes to `logs/`, which nginx never
    serves:
    ```
@@ -264,6 +272,13 @@ one can brute-force an account:
   recipient list to trusted addresses.
 - By design, students identify themselves by student ID + exact name only (no password). Lookup
   returns a student ID for an exact name, and rate limiting is the main protection.
+- Server packages: keep PHP and nginx patched (`unattended-upgrades` installs Ubuntu security
+  updates). Ubuntu's nginx (1.24.0 on 24.04) gets security fixes backported without changing its
+  version number. To check an [nginx.org advisory](https://nginx.org/en/security_advisories.html),
+  search the changelog for the CVE instead of comparing versions:
+  `zcat /usr/share/doc/nginx/changelog.Debian.gz | grep CVE-YYYY-NNNNN`. PHP from the ondrej/php
+  PPA follows upstream versions, so for PHP, compare `php-fpm8.5 -v` against the fixed version in
+  the advisory.
 
 ## Known simplifications
 
