@@ -167,6 +167,35 @@ Substitute your own domain, paths and PHP version.
     `/admin/backup.php`.
 11. Open a batch's registration and create its class schedule (next section).
 
+## Production installation (shared hosting, e.g. Hostinger hPanel)
+
+Shared hosting has no root, no nginx and no crontab command; the web server is LiteSpeed/Apache.
+The app needs no code changes, only:
+
+1. **PHP**: select 8.5 in the panel, then check that both the web PHP and the SSH/cron CLI
+   (`php -v`) report at least the version required on the VM. Switch `expose_php` and
+   `display_errors` off in the panel's PHP options.
+2. **Code**: `git clone` the repo (public, HTTPS) into the domain's `public_html`. The repo's
+   `.htaccess` is the nginx allowlist for Apache/LiteSpeed: only the four public pages,
+   `admin/*.php` and static files under `assets/` are served, everything else is 404, and HTTP
+   redirects to HTTPS.
+3. **Database**: create the database and user in the panel (both get the account prefix, e.g.
+   `u123_…`). `schema.sql` starts with `CREATE DATABASE`/`USE`, which a panel user can't run:
+   import it with those lines removed (or via phpMyAdmin), or restore a `.sql.gz` backup, which
+   recreates every table. `db_host` is `localhost`.
+4. **`config.local.php`** (mode 600): use external SMTP (STARTTLS on 587; `encryption => 'ssl'` on
+   465 if 587 is blocked) and set `backup.directory` to a folder **outside** `public_html`.
+5. **Cron** (panel → Cron Jobs, "Custom" type; no crontab over SSH): `/usr/bin/php <app dir>/cron/clear_expired_otp.php`
+   hourly and `/usr/bin/php <app dir>/cron/backup.php` weekly, each appending `>> <log dir>/<job>.log 2>&1`
+   to a log folder outside `public_html` (mode 700). The panel schedules in **server time, which is
+   often UTC** (`date` over SSH), not Bangkok time: Saturday 23:00 Bangkok is `0 16 * * 6` in UTC.
+6. **SSL**: enable the panel's free certificate. If a CDN sits in front, confirm `REMOTE_ADDR` is
+   still the visitor's IP (rate limiting keys on it), or turn the CDN off.
+7. **Check from outside** as in step 10 above.
+
+Deploying there is `git pull --ff-only` in the app directory as the account user (no
+`sudo -u www-data`); migrations run with the panel's database user.
+
 ## Before students can register or check in
 
 An admin needs to, via `/admin/classes.php`:
@@ -234,7 +263,7 @@ Production runs the app as a git checkout of this repo, owned by the web server 
 
 Migrations change the schema, so apply them as MySQL root, not the app's restricted user. nginx is
 an allowlist (see Production installation step 6): a deploy that adds a new top-level public `.php`
-page must also add it to the nginx regex, or it will return 404. Check from outside with
+page must also add it to the nginx regex and to `.htaccess` (shared hosting), or it will return 404. Check from outside with
 `curl -I https://<site>/<path>`; anything not on the allowlist should return 404.
 
 To roll back, `git reset --hard <previous commit>` in the app directory (and restore the backup
