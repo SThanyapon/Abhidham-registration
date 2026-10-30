@@ -173,12 +173,16 @@ Shared hosting has no root, no nginx and no crontab command; the web server is L
 The app needs no code changes, only:
 
 1. **PHP**: select 8.5 in the panel, then check that both the web PHP and the SSH/cron CLI
-   (`php -v`) report at least the version required on the VM. Switch `expose_php` and
-   `display_errors` off in the panel's PHP options.
+   (`php -v`) report at least the version required on the VM. In the panel's PHP options: switch
+   `expose_php` and `display_errors` off, `log_errors` on with `error_log` in a folder outside
+   `public_html`, lower `upload_max_filesize`/`post_max_size` to a few MB (the CSV import is the
+   only upload), and raise `session.gc_maxlifetime` to 3600 so admin sessions aren't purged before
+   the app's 1-hour idle timeout.
 2. **Code**: `git clone` the repo (public, HTTPS) into the domain's `public_html`. The repo's
    `.htaccess` is the nginx allowlist for Apache/LiteSpeed: only the four public pages,
    `admin/*.php` and static files under `assets/` are served, everything else is 404, and HTTP
-   redirects to HTTPS.
+   redirects to HTTPS. It also sends the same four security headers as the nginx block and strips
+   `X-Powered-By`.
 3. **Database**: create the database and user in the panel (both get the account prefix, e.g.
    `u123_…`). `schema.sql` starts with `CREATE DATABASE`/`USE`, which a panel user can't run:
    import it with those lines removed (or via phpMyAdmin), or restore a `.sql.gz` backup, which
@@ -190,11 +194,20 @@ The app needs no code changes, only:
    to a log folder outside `public_html` (mode 700). The panel schedules in **server time, which is
    often UTC** (`date` over SSH), not Bangkok time: Saturday 23:00 Bangkok is `0 16 * * 6` in UTC.
 6. **SSL**: enable the panel's free certificate. If a CDN sits in front, confirm `REMOTE_ADDR` is
-   still the visitor's IP (rate limiting keys on it), or turn the CDN off.
-7. **Check from outside** as in step 10 above.
+   still the visitor's IP (rate limiting keys on it), or turn the CDN off. Connecting a new domain
+   to the site moves it to `domains/<new domain>/public_html`: update the cron paths and re-check
+   `config.local.php`'s mode afterwards.
+7. **Email DNS** for the OTP/backup sender's domain: an SPF record including the SMTP provider and
+   ending in `~all` (not `?all`), the provider's DKIM record, and a DMARC record
+   (`_dmarc` TXT `v=DMARC1; p=none; rua=mailto:<you>`, tightened to `quarantine` once reports are
+   clean). Without them OTP emails can land in spam and the domain can be spoofed.
+8. **Check from outside** as in step 10 above.
 
 Deploying there is `git pull --ff-only` in the app directory as the account user (no
-`sudo -u www-data`); migrations run with the panel's database user.
+`sudo -u www-data`); migrations run with the panel's database user. If the panel's Git
+auto-deploy is enabled instead, every push to `master` goes live within seconds, so protect the
+GitHub account (2FA) and the `master` branch. Hostinger's publish step resets `config.local.php`
+to 644, so run `chmod 600 config.local.php` after every deploy.
 
 ## Before students can register or check in
 

@@ -61,7 +61,8 @@ login. There is no templating engine; HTML is written directly in the `.php` fil
 block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output. The web server is an
 allowlist (`/`, the four public `.php` files, `/admin/*.php`, static `/assets/`; everything else 404):
 nginx config on a Linux server, the repo's `.htaccess` on Apache/LiteSpeed shared hosting. A new
-top-level page needs both updated (see README "Deploying").
+top-level page needs both updated (see README "Deploying"). Both also send the same security headers
+(X-Frame-Options, nosniff, Referrer-Policy, HSTS), so a header change goes in both places.
 
 `index.php` is a landing page. While a batch has registration open, the first view in a session pops
 up the intake poster (`assets/images/landingpage.jpg`, a `<dialog>`, flagged by
@@ -107,7 +108,7 @@ up the intake poster (`assets/images/landingpage.jpg`, a `<dialog>`, flagged by
   and not counting future scheduled sessions) — this is a deliberate business rule, not a bug.
 - `backup.php` — `runBackup()`: pure-PHP `SHOW CREATE TABLE` + row dump, gzip-compressed to a
   timestamped `.sql.gz` file under `config.local.php['backup']['directory']` (no dependency on the
-  `mysqldump` binary), emailed as an attachment to each recipient, logged to `backup_runs`.
+  `mysqldump` binary; file chmod 0600, a new directory 0700), emailed as an attachment to each recipient, logged to `backup_runs`.
   Recipients come from `getBackupRecipients()`: the comma-separated `backup_recipient_email` row in
   the `app_settings` key/value table (edited in `admin/backup.php` via `saveBackupRecipients()`),
   falling back to `config.local.php['backup']['recipient_email']` until one is saved.
