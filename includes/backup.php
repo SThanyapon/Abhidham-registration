@@ -40,7 +40,7 @@ function runBackup(string $triggeredBy): array
     $dir = rtrim($config['backup']['directory'], '/\\');
 
     if (!is_dir($dir)) {
-        mkdir($dir, 0755, true);
+        mkdir($dir, 0700, true);
     }
 
     $mysqli = getDbConnection();
@@ -75,6 +75,8 @@ function runBackup(string $triggeredBy): array
     $filePath = $dir . DIRECTORY_SEPARATOR . $filename;
     $compressed = gzencode($sql, 9);
     file_put_contents($filePath, $compressed);
+    // Full dump incl. admin password hashes: owner-only, whatever the umask of cron/web/CLI.
+    chmod($filePath, 0600);
 
     $recipients = getBackupRecipients();
     $body = "ระบบได้สำรองฐานข้อมูลแล้ว ไฟล์สำรองข้อมูล (บีบอัดแบบ gzip) แนบมากับอีเมลนี้\n"
