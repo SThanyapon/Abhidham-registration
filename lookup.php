@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <form action="lookup.php" method="post">
         <?= csrfField() ?>
-        <label for="full_name">ชื่อ-นามสกุล (ภาษาไทย)</label>
+        <label for="full_name">ชื่อ-นามสกุล (ภาษาไทย) กรอกเฉพาะชื่อและนามสกุล ไม่ต้องกรอกคำนำหน้า</label>
         <input type="text" id="full_name" name="full_name" required>
         <button type="submit">ค้นหา</button>
     </form>

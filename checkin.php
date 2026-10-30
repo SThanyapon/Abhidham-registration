@@ -189,7 +189,7 @@ foreach ($classes as $class) {
         <label for="student_no">รหัสนักศึกษา<span class="required-mark">*</span></label>
         <input type="text" id="student_no" name="student_no" required value="<?= htmlspecialchars($studentNo) ?>">
 
-        <label for="full_name">ชื่อ-นามสกุล (ภาษาไทย)<span class="required-mark">*</span></label>
+        <label for="full_name">ชื่อ-นามสกุล (ภาษาไทย) กรอกเฉพาะชื่อและนามสกุล ไม่ต้องกรอกคำนำหน้า<span class="required-mark">*</span></label>
         <input type="text" id="full_name" name="full_name" required value="<?= htmlspecialchars($fullName) ?>">
 
         <label for="class_instance_id">ชั้นเรียน</label>
