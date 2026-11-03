@@ -216,7 +216,8 @@ permissions can't be edited after creation.
 class_instance with the highest `class_levels.sort_order`. `checkin.php` offers only that class per
 batch, only while it's open (`is_closed = 0`; a closed current class leaves the batch with nothing
 to offer, no fallback to an older class), and only sessions dated today or earlier (future and
-closed-class check-ins are refused server-side too).
+closed-class check-ins are refused server-side too). A chosen class that isn't the student's
+current class is refused and shows no progress card; with no class chosen, progress is shown.
 `admin/classes.php` shows the จัดการตารางเรียน link (to `admin/schedule.php?class_instance_id=`) only
 for that class; `admin/schedule.php` enforces the same rule server-side (other classes and closed
 classes are read-only) and redirects after each POST so a refresh can't generate the schedule

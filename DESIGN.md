@@ -249,15 +249,18 @@ auto-detection by date). Only sessions dated today or earlier (Asia/Bangkok) are
 server refuses a check-in for a future-dated session. System:
 1. Verifies ID + name match an approved student, and finds their current class instance
    (`studentClassInstanceId()`, batch + current level). No class instance yet → a notice, no grid.
-2. **Check-in mode** (class and session both chosen): the class must be the student's current
-   class; if already checked in for that session → error; otherwise insert into `checkins` and
+2. If a class is chosen (with or without a session) and it isn't the student's current class →
+   error "ชั้นเรียนที่เลือกไม่ตรงกับชั้นเรียนปัจจุบันของท่าน" and **no** progress card.
+3. **Check-in mode** (class and session both chosen, class matches): a closed class → error;
+   if already checked in for that session → error; otherwise insert into `checkins` and
    confirm "ลงชื่อเข้าเรียนเรียบร้อยแล้ว".
-3. **View-only mode** (class or session missing): nothing is written; a notice explains that only
-   progress is shown.
-4. In both modes, render the student's รหัสนักศึกษา / คำนำหน้า / ชื่อ-นามสกุล, then a grid of all
+4. **View-only mode** (no class chosen, or a matching class without a session): nothing is
+   written; a notice explains that only progress is shown.
+5. Unless the class mismatched, render the student's รหัสนักศึกษา / คำนำหน้า / ชื่อ-นามสกุล /
+   ชั้นเรียน (current level name), then a grid of all
    sessions so far for their current class: green = checked in, grey = missing. ID, name and
    class are refilled after submitting.
-5. `% complete = checkins / (count of sessions whose date <= the most recent past session's
+6. `% complete = checkins / (count of sessions whose date <= the most recent past session's
    date)` — i.e. only sessions already conducted count toward the denominator, not future
    scheduled ones.
 Rate-limited.

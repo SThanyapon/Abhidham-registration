@@ -48,9 +48,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'กรุณากรอก: ' . implode(', ', $missing);
         } else {
             $stmt = $mysqli->prepare(
-                'SELECT id, prefix, prefix_other, full_name, student_no
-                 FROM students
-                 WHERE student_no = ? AND full_name = ? AND status = "approved"'
+                'SELECT s.id, s.prefix, s.prefix_other, s.full_name, s.student_no, cl.name AS level_name
+                 FROM students s
+                 LEFT JOIN class_levels cl ON cl.id = s.current_class_level_id
+                 WHERE s.student_no = ? AND s.full_name = ? AND s.status = "approved"'
             );
             $stmt->bind_param('ss', $studentNo, $fullName);
             $stmt->execute();
@@ -70,15 +71,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $closedStmt->close();
                 }
 
+                $classMismatch = false;
+
                 if ($currentClassId === null) {
                     $notice = 'ยังไม่มีตารางเรียนสำหรับชั้นเรียนปัจจุบันของท่าน';
+                } elseif ($classInstanceId > 0 && $classInstanceId !== $currentClassId) {
+                    // A chosen class that isn't the student's current class: refused, and no
+                    // progress is shown (with or without a session chosen).
+                    $error = 'ชั้นเรียนที่เลือกไม่ตรงกับชั้นเรียนปัจจุบันของท่าน';
+                    $classMismatch = true;
                 } elseif ($classInstanceId > 0 && $sessionId > 0) {
                     // Check-in mode: both class and session chosen.
                     if ($currentClassClosed) {
                         // A closed class (admin/classes.php) takes no more check-ins; progress still shows.
                         $error = 'ห้องเรียนนี้ปิดแล้ว ไม่สามารถลงชื่อเข้าเรียนได้';
-                    } elseif ($classInstanceId !== $currentClassId) {
-                        $error = 'ชั้นเรียนที่เลือกไม่ตรงกับชั้นเรียนปัจจุบันของท่าน';
                     } else {
                         $sessionStmt = $mysqli->prepare(
                             'SELECT id FROM sessions
@@ -122,7 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         . 'หากต้องการลงชื่อ กรุณาเลือกชั้นเรียนและครั้งที่)';
                 }
 
-                if ($currentClassId !== null) {
+                if ($currentClassId !== null && !$classMismatch) {
                     $attendance = getAttendanceSummary($mysqli, $currentClassId, (int) $student['id']);
                 }
             }
@@ -236,7 +242,8 @@ foreach ($classes as $class) {
             <p>
                 รหัสนักศึกษา: <strong><?= htmlspecialchars($student['student_no']) ?></strong><br>
                 คำนำหน้า: <strong><?= htmlspecialchars(studentPrefix($student)) ?></strong><br>
-                ชื่อ-นามสกุล: <strong><?= htmlspecialchars($student['full_name']) ?></strong>
+                ชื่อ-นามสกุล: <strong><?= htmlspecialchars($student['full_name']) ?></strong><br>
+                ชั้นเรียน: <strong><?= htmlspecialchars($student['level_name'] ?? '-') ?></strong>
             </p>
             <p class="progress">
                 ความก้าวหน้า: <?= $attendance['completed_count'] ?> / <?= $attendance['conducted_count'] ?>
