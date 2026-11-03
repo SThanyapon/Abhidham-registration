@@ -29,10 +29,48 @@ if (!in_array($filterLevelId, array_map('intval', array_column($levelOptions, 'i
     $filterLevelId = 0;
 }
 
+// Optional ห้องเรียน filter (approved view): one class instance, any class incl. finished/closed ones,
+// listed only for the chosen รุ่น when that filter is set.
+$classOptions = [];
+$filterClass = null;
+if ($view === 'approved') {
+    $stmt = $mysqli->prepare(
+        'SELECT ci.id, ci.batch_id, ci.is_closed, cl.name AS level_name, cl.sort_order, b.batch_no, b.name AS batch_name
+         FROM class_instances ci
+         JOIN class_levels cl ON cl.id = ci.class_level_id
+         JOIN batches b ON b.id = ci.batch_id
+         WHERE (? = 0 OR ci.batch_id = ?)
+         ORDER BY b.batch_no DESC, cl.sort_order'
+    );
+    $stmt->bind_param('ii', $filterBatchId, $filterBatchId);
+    $stmt->execute();
+    $classOptions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    $requestedClassId = (int) ($_GET['class_instance_id'] ?? 0);
+    foreach ($classOptions as $option) {
+        if ((int) $option['id'] === $requestedClassId) {
+            $filterClass = $option;
+            break;
+        }
+    }
+}
+$filterClassId = $filterClass ? (int) $filterClass['id'] : 0;
+// A chosen ห้องเรียน lists every approved student of its batch who has reached its level (including
+// those promoted since), so it overrides the รุ่น filter and ignores the ระดับชั้น (current level) one.
+$minLevelSort = 0;
+if ($filterClass) {
+    $filterBatchId = (int) $filterClass['batch_id'];
+    $filterLevelId = 0;
+    $minLevelSort = (int) $filterClass['sort_order'];
+}
+
 // Query-string suffix that carries the active filters through sort, export and view links.
-function filterQuery(int $batchId, int $levelId): string
+function filterQuery(int $batchId, int $levelId, int $classInstanceId = 0): string
 {
-    return ($batchId > 0 ? '&batch_id=' . $batchId : '') . ($levelId > 0 ? '&level_id=' . $levelId : '');
+    return ($batchId > 0 ? '&batch_id=' . $batchId : '')
+        . ($levelId > 0 ? '&level_id=' . $levelId : '')
+        . ($classInstanceId > 0 ? '&class_instance_id=' . $classInstanceId : '');
 }
 
 if ($view === 'approved') {
@@ -109,9 +147,13 @@ if ($view === 'approved') {
          WHERE s.status = 'approved'
            AND (? = 0 OR s.batch_id = ?)
            AND (? = 0 OR s.current_class_level_id = ?)
+           AND (? = 0 OR cl.sort_order >= ?)
          ORDER BY $orderBy"
     );
-    $stmt->bind_param('iiii', $filterBatchId, $filterBatchId, $filterLevelId, $filterLevelId);
+    $stmt->bind_param(
+        'iiiiii',
+        $filterBatchId, $filterBatchId, $filterLevelId, $filterLevelId, $minLevelSort, $minLevelSort
+    );
     $stmt->execute();
     $students = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
@@ -160,10 +202,26 @@ if ($selectedStudentId > 0) {
     }
 }
 
+// Matrix view (a ห้องเรียน chosen, no student selected): the class's non-cancelled sessions as
+// columns. A session counts as conducted once its date has passed, matching getAttendanceSummary().
+$matrixSessions = [];
+$today = date('Y-m-d');
+if ($filterClass && $selectedStudentId === 0) {
+    $stmt = $mysqli->prepare(
+        'SELECT id, session_number, session_date FROM sessions
+         WHERE class_instance_id = ? AND is_cancelled = 0 ORDER BY session_number'
+    );
+    $stmt->bind_param('i', $filterClassId);
+    $stmt->execute();
+    $matrixSessions = addDisplayNumbers($stmt->get_result()->fetch_all(MYSQLI_ASSOC));
+    $stmt->close();
+}
+
 $allReports = [];
 if ($view === 'approved' && $selectedStudentId === 0) {
     foreach ($students as $student) {
-        $classInstanceId = studentClassInstanceId($mysqli, (int) $student['id']);
+        // With a ห้องเรียน chosen every row reports on that class; otherwise on the student's current one.
+        $classInstanceId = $filterClass ? $filterClassId : studentClassInstanceId($mysqli, (int) $student['id']);
         $allReports[] = [
             'student' => $student,
             'summary' => $classInstanceId !== null
@@ -205,13 +263,28 @@ function batchLabel(array $row): string
     return $row['batch_name'] ?: 'รุ่น ' . $row['batch_no'];
 }
 
+/**
+ * One matrix cell: $checked if the student checked in to $session, $missed if it has been held
+ * (dated today or earlier) without a check-in, $future if it hasn't been held yet.
+ */
+function matrixCell(array $summary, array $session, string $today, string $checked, string $missed, string $future): string
+{
+    foreach ($summary['sessions'] as $s) {
+        if ((int) $s['id'] === (int) $session['id'] && $s['checked_in']) {
+            return $checked;
+        }
+    }
+
+    return $session['session_date'] <= $today ? $missed : $future;
+}
+
 if ($exportCsv) {
     if ($view === 'rejected') {
         $filename = 'rejected_applicants.csv';
     } else {
         $filename = $selectedStudent
             ? 'attendance_' . preg_replace('/[^A-Za-z0-9]+/', '_', $selectedStudent['student_no'] ?? (string) $selectedStudentId) . '.csv'
-            : 'attendance_all_students.csv';
+            : ($filterClass ? 'attendance_class_' . $filterClassId . '.csv' : 'attendance_all_students.csv');
     }
 
     header('Content-Type: text/csv; charset=utf-8');
@@ -264,6 +337,28 @@ if ($exportCsv) {
                 $session['checked_in'] ? 'ใช่' : 'ไม่ใช่',
             ]));
         }
+    } elseif ($filterClass) {
+        // Per-session detail for one ห้องเรียน: ✓ checked in, - missed, blank = not held yet.
+        fputcsv($out, csvSafe(['รุ่น', batchLabel($filterClass), 'ระดับชั้น', $filterClass['level_name']]));
+        fputcsv($out, []);
+        $header = ['รหัสนักศึกษา', 'คำนำหน้า', 'ชื่อ-นามสกุล', 'ระดับชั้นปัจจุบัน'];
+        foreach ($matrixSessions as $session) {
+            $header[] = 'ครั้งที่ ' . $session['display_number'] . ' (' . $session['session_date'] . ')';
+        }
+        fputcsv($out, array_merge($header, ['เข้าเรียน (ครั้ง)', 'จัดสอนแล้ว (ครั้ง)', 'ร้อยละ']));
+        foreach ($allReports as $row) {
+            $s = $row['student'];
+            $summary = $row['summary'];
+            $line = [$s['student_no'] ?? '-', studentPrefix($s), $s['full_name'], $s['level_name']];
+            foreach ($matrixSessions as $session) {
+                $line[] = matrixCell($summary, $session, $today, '✓', '-', '');
+            }
+            fputcsv($out, csvSafe(array_merge($line, [
+                $summary['completed_count'],
+                $summary['conducted_count'],
+                $summary['percent'] . '%',
+            ])));
+        }
     } else {
         fputcsv($out, ['รหัสนักศึกษา', 'คำนำหน้า', 'ชื่อ-นามสกุล', 'รุ่น', 'ระดับชั้น', 'เข้าเรียน (ครั้ง)', 'จัดสอนแล้ว (ครั้ง)', 'ร้อยละ']);
         foreach ($allReports as $row) {
@@ -286,7 +381,9 @@ if ($exportCsv) {
     exit;
 }
 
-$filters = filterQuery($filterBatchId, $filterLevelId);
+$filters = filterQuery($filterBatchId, $filterLevelId, $filterClassId);
+// The student list with the current filters and sort, without a selected student.
+$listHref = 'reports.php?view=approved&sort=' . urlencode($sort) . '&dir=' . $dir . $filters;
 $exportHref = 'reports.php?export=csv&view=' . $view . '&sort=' . urlencode($sort) . '&dir=' . $dir
     . ($selectedStudentId > 0 ? '&student_id=' . $selectedStudentId : '') . $filters;
 ?>
@@ -339,6 +436,16 @@ $exportHref = 'reports.php?export=csv&view=' . $view . '&sort=' . urlencode($sor
                 <?php endforeach; ?>
             </select>
 
+            <label for="class_instance_id">ห้องเรียน (รายละเอียดการเข้าเรียนรายครั้ง)</label>
+            <select id="class_instance_id" name="class_instance_id" onchange="resetStudentAndSubmit(this.form, false)">
+                <option value="0">-- ไม่เลือก (ดูสรุปตามชั้นเรียนปัจจุบัน) --</option>
+                <?php foreach ($classOptions as $option): ?>
+                    <option value="<?= (int) $option['id'] ?>" <?= $filterClassId === (int) $option['id'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars(batchLabel($option) . ' - ' . $option['level_name'] . ($option['is_closed'] ? ' (ปิดแล้ว)' : '')) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+
             <label for="student_id">นักศึกษา</label>
             <select id="student_id" name="student_id" onchange="this.form.submit()">
                 <option value="0" <?= $selectedStudentId === 0 ? 'selected' : '' ?>>-- นักศึกษาทั้งหมด --</option>
@@ -353,10 +460,14 @@ $exportHref = 'reports.php?export=csv&view=' . $view . '&sort=' . urlencode($sor
     </form>
 
     <script>
-        // A changed filter may exclude the selected student, so go back to "all students".
-        function resetStudentAndSubmit(form) {
+        // A changed filter may exclude the selected student, so go back to "all students". Changing
+        // รุ่น or ระดับชั้น also clears the ห้องเรียน, which would otherwise override them.
+        function resetStudentAndSubmit(form, clearClass = true) {
             if (form.student_id) {
                 form.student_id.value = '0';
+            }
+            if (clearClass && form.class_instance_id) {
+                form.class_instance_id.value = '0';
             }
             form.submit();
         }
@@ -409,7 +520,9 @@ $exportHref = 'reports.php?export=csv&view=' . $view . '&sort=' . urlencode($sor
             <p class="error">ไม่พบนักศึกษา</p>
         <?php elseif (!$singleReport): ?>
             <p class="error">ยังไม่มีตารางเรียนสำหรับระดับชั้นปัจจุบันของนักศึกษาคนนี้</p>
-        <?php else: ?>
+        <?php endif; ?>
+        <p><a href="<?= htmlspecialchars($listHref) ?>">กลับไปรายชื่อนักศึกษา</a></p>
+        <?php if ($selectedStudent && $singleReport): ?>
             <div class="card">
                 <p>
                     <strong><?= htmlspecialchars(($selectedStudent['student_no'] ?? '-') . ' ' . studentPrefix($selectedStudent) . ' ' . $selectedStudent['full_name']) ?></strong>
@@ -430,6 +543,50 @@ $exportHref = 'reports.php?export=csv&view=' . $view . '&sort=' . urlencode($sor
                 </div>
             </div>
         <?php endif; ?>
+    <?php elseif ($filterClass): ?>
+        <h2><?= htmlspecialchars(batchLabel($filterClass) . ' - ' . $filterClass['level_name']) ?><?= $filterClass['is_closed'] ? ' (ปิดแล้ว)' : '' ?></h2>
+        <?php if ($matrixSessions === []): ?>
+            <p class="notice">ห้องเรียนนี้ยังไม่มีตารางเรียน</p>
+        <?php elseif ($allReports === []): ?>
+            <p>ไม่มีนักศึกษาในห้องเรียนนี้</p>
+        <?php else: ?>
+            <p class="form-note">สีเขียว = ลงชื่อเข้าเรียน · สีเทา = ไม่ได้ลงชื่อ · ช่องว่าง = ยังไม่ถึงวันเรียน · คลิกชื่อเพื่อดูรายบุคคล</p>
+            <div class="table-wrap"><table class="attendance-matrix">
+                <thead>
+                    <tr>
+                        <?php foreach (['student_no', 'prefix', 'full_name', 'level'] as $key): ?>
+                            <th><?= sortHeader($key, $sortColumns[$key], $sort, $dir, $view, $filters) ?></th>
+                        <?php endforeach; ?>
+                        <?php foreach ($matrixSessions as $session): $dateBE = formatDateBEShort($session['session_date']); ?>
+                            <th class="matrix-session-head" title="<?= htmlspecialchars($dateBE) ?>">
+                                <?= (int) $session['display_number'] ?><br><small><?= htmlspecialchars($dateBE) ?></small>
+                            </th>
+                        <?php endforeach; ?>
+                        <th><?= sortHeader('completed', $sortColumns['completed'], $sort, $dir, $view, $filters) ?></th>
+                        <th><?= sortHeader('percent', $sortColumns['percent'], $sort, $dir, $view, $filters) ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($allReports as $row): $s = $row['student']; $summary = $row['summary']; ?>
+                        <tr>
+                            <td><?= htmlspecialchars($s['student_no'] ?? '-') ?></td>
+                            <td><?= htmlspecialchars(studentPrefix($s)) ?></td>
+                            <td><a href="<?= htmlspecialchars($listHref . '&student_id=' . (int) $s['id']) ?>"><?= htmlspecialchars($s['full_name']) ?></a></td>
+                            <td><?= htmlspecialchars($s['level_name']) ?></td>
+                            <?php foreach ($matrixSessions as $session): $cell = matrixCell($summary, $session, $today, 'checked', 'missing', ''); ?>
+                                <td class="matrix-cell">
+                                    <?php if ($cell !== ''): ?>
+                                        <span class="session-box mini <?= $cell ?>" title="<?= htmlspecialchars('ครั้งที่ ' . $session['display_number'] . ' ' . formatDateBEShort($session['session_date'])) ?>"></span>
+                                    <?php endif; ?>
+                                </td>
+                            <?php endforeach; ?>
+                            <td><?= $summary['completed_count'] . ' / ' . $summary['conducted_count'] ?></td>
+                            <td><?= $summary['percent'] ?>%</td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table></div>
+        <?php endif; ?>
     <?php else: ?>
         <div class="table-wrap"><table>
             <thead>
@@ -444,7 +601,7 @@ $exportHref = 'reports.php?export=csv&view=' . $view . '&sort=' . urlencode($sor
                     <tr>
                         <td><?= htmlspecialchars($s['student_no'] ?? '-') ?></td>
                         <td><?= htmlspecialchars(studentPrefix($s)) ?></td>
-                        <td><?= htmlspecialchars($s['full_name']) ?></td>
+                        <td><a href="<?= htmlspecialchars($listHref . '&student_id=' . (int) $s['id']) ?>"><?= htmlspecialchars($s['full_name']) ?></a></td>
                         <td><?= htmlspecialchars(batchLabel($s)) ?></td>
                         <td><?= htmlspecialchars($s['level_name']) ?></td>
                         <td><?= $summary !== null ? $summary['completed_count'] . ' / ' . $summary['conducted_count'] : '-' ?></td>

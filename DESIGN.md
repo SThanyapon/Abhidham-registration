@@ -397,7 +397,15 @@ all approved students at once:
   generated) show `-`. Sorted by รหัสนักศึกษา ascending by default (numeric-aware: by length,
   then value, so `7201 < 10101`); every column header is clickable to toggle ascending/descending
   (`?sort=…&dir=asc|desc`, whitelisted). Stored columns sort in SQL; the computed attendance
-  columns sort in PHP. The student dropdown uses the same order.
+  columns sort in PHP. The student dropdown uses the same order. Each name links to that
+  student's single view, which links back to the list with the same filters and sort.
+- **ห้องเรียน detail** (`?class_instance_id=`, any class incl. closed ones) — a matrix of one row
+  per student and one column per non-cancelled session (ครั้งที่ + BE date): green box = checked
+  in, grey = held but missed, blank = not held yet, then completed/conducted and % (the same
+  `getAttendanceSummary()` numbers, computed for that class). The rows are every approved student of the
+  class's batch whose current level is at or past the class's level, so a finished class can still
+  be reported after promotions. The ห้องเรียน filter overrides รุ่น and ignores ระดับชั้น.
+  Its CSV export is the same matrix (`✓` / `-` / blank) under a รุ่น/ระดับชั้น line.
 
 **ผู้สมัครที่ไม่ได้รับการอนุมัติ (rejected)** — every `status = 'rejected'` registration with
 คำนำหน้า, ชื่อ-นามสกุล, รุ่น, อายุ, เบอร์โทรศัพท์, Line ID, ชื่อไลน์, ผู้แนะนำ, ประเทศ, จังหวัด,
@@ -683,3 +691,5 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
   pages: batches moved to `admin/batches.php`, and `admin/classes.php` now holds only class
   instances (Feature 1, section 5). A class can be closed once its level is finished, which stops
   check-ins and freezes its schedule (`migrations/2026-11-class-closed.sql`).
+- **Per-session attendance by ห้องเรียน (2026-11)** — reports gained a ห้องเรียน filter with an
+  on-screen check-in matrix and a matching CSV, and clickable student names (Feature 3).

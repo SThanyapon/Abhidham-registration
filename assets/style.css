@@ -566,6 +566,27 @@ table form {
     color: #475569;
 }
 
+/* admin/reports.php ห้องเรียน matrix: one small box per session per student */
+.session-box.mini {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    margin: 0 auto;
+}
+
+.attendance-matrix .matrix-session-head,
+.attendance-matrix .matrix-cell {
+    text-align: center;
+    padding-left: 4px;
+    padding-right: 4px;
+    white-space: nowrap;
+}
+
+.attendance-matrix .matrix-session-head small {
+    font-weight: 400;
+    font-size: 0.75rem;
+}
+
 .session-table {
     background: var(--surface);
     border-radius: var(--radius);

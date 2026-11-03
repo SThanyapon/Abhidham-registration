@@ -262,3 +262,10 @@ prefix/name/batch/date, newest first by default, with its own CSV export); rejec
 `student_no` or level, so that view skips the `class_levels` join. Optional filters `?batch_id=`
 (both views) and `?level_id=` (current level, approved view only) narrow the table, the student
 dropdown and the CSV export; `filterQuery()` carries them through sort, export and view links.
+Student names in the tables link to the single-student grid (current class), which has a back
+link to the list. A `?class_instance_id=` (ห้องเรียน) filter, approved view only, switches the
+table to a per-session matrix for that class (green = checked in, grey = missed, blank = not held
+yet, via `matrixCell()`), and the CSV export becomes the same matrix (`✓` / `-` / blank). Any class can be chosen, closed
+ones too. It lists every approved student of that batch whose current level is at or past the
+class's level, so a finished class still reports after promotions. It overrides the รุ่น filter
+and ignores the ระดับชั้น one. Changing either of those clears it.
