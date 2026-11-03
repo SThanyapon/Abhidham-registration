@@ -47,8 +47,9 @@ php scripts/normalize_whitespace.php
 
 First-time setup requires copying `config.local.php.example` to `config.local.php` (gitignored) and
 filling in DB/SMTP credentials — `includes/db.php` calls `die()` if it's missing. Before students can
-register or check in, an admin must open a batch's registration and generate a class schedule via
-`/admin/classes.php` (see README.md). README.md also has the full production installation for a
+register or check in, an admin must open a batch's registration and create a class instance via
+`/admin/classes.php`, then generate its schedule on `/admin/schedule.php` (the จัดการตารางเรียน link;
+see README.md). README.md also has the full production installation for a
 Linux server (nginx allowlist + PHP-FPM, certbot, dedicated MySQL user, www-data cron, php.ini), the
 shared-hosting variant (hPanel database/cron, `.htaccess`, cron schedules in server time — often UTC)
 and the deploy procedure (`git pull --ff-only` on the server).
@@ -69,6 +70,8 @@ top-level page needs both updated (see README "Deploying"). Both also send the s
 up the intake poster (`assets/images/landingpage.jpg`, a `<dialog>`, flagged by
 `$_SESSION['landing_seen']`). `?register=1` shows the form, and `?success=1` shows the classroom QR
 (`assets/images/qr-code7.jpg`). These images are per-intake content; swap the files for a new รุ่น.
+Both "ลงทะเบียนเลย" (the welcome screen's link and the poster's button) are the large blue
+`.cta-button`.
 
 **`includes/` — shared logic, loaded via `require_once`, no autoloading:**
 - `db.php` — sets the PHP timezone to `Asia/Bangkok` (so `date('Y-m-d')` "today" rolls over at
@@ -167,7 +170,8 @@ colours should be added as tokens rather than hard-coded); reuse its classes rat
 headers), `.view-toggle` (pill switch between views), `.field-group`, `.choice-field` (a
 `studentChoiceField()` question), `.address-panel` (borderless `<fieldset>` per address
 residence), `button.danger` /
-`button.secondary`, `.feature-links` (the dashboard's two-column card grid, one column under
+`button.secondary`, `.cta-button` (large blue call-to-action for a `<button>` or a link, colours
+from the `--cta*` tokens; public pages only), `.feature-links` (the dashboard's two-column card grid, one column under
 480px), and the nav classes
 `.nav-admin` (public pages' ผู้ดูแลระบบ link, right-aligned, orange) and `.nav-logout` (admin
 pages' ออกจากระบบ, a POST form with a CSRF token styled as a right-aligned red link; `logout.php`
@@ -214,6 +218,14 @@ batch, and only sessions dated today or earlier (future check-ins are refused se
 for that class; `admin/schedule.php` enforces the same rule server-side (other classes are read-only)
 and redirects after each POST so a refresh can't generate the schedule twice. `classes.php` allows opening/closing
 registration only for the latest batch (highest `batch_no`, also enforced in the POST handler).
+
+Feature 1 is two pages. `admin/classes.php` handles batches (create, registration toggle) and class
+instances (created with รุ่น + ระดับ only; the table shows each class's start date and number of
+non-cancelled sessions). `admin/schedule.php?class_instance_id=` generates a class's sessions and
+cancels/un-cancels them; an unknown ID redirects back to `classes.php`. A class's start date is
+always its **first non-cancelled session's date**, derived in both pages (`—` / ยังไม่มีตารางเรียน
+when there's no schedule). `class_instances.start_date` is a legacy nullable column
+(`migrations/2026-11-class-start-date-optional.sql`) that nothing reads or writes; don't bring it back.
 
 `admin/import_students.php` (feature 6): CSV-imported students skip approval. They're inserted as
 `approved` with the file's student ID, a batch derived from that ID (all but the last 3 digits) and

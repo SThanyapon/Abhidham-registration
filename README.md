@@ -41,7 +41,7 @@ original requirements.
    php -S localhost:8000
    ```
 5. Open `http://localhost:8000`:
-   - `/` — landing page; click "ลงทะเบียน" (Register) (or visit `/?register=1`) to open the
+   - `/` — landing page; click the large blue "ลงทะเบียนเลย" button or the "ลงทะเบียน" (Register) menu link (or visit `/?register=1`) to open the
      registration form (in Thailand the address starts with the postcode, which narrows the
      จังหวัด/อำเภอ/ตำบล dropdowns; abroad it's free text). While a batch's registration is
      open, the first visit in a browser session pops up the intake poster (`assets/images/landingpage.jpg`); after submitting, the page shows
@@ -218,11 +218,14 @@ to 644, so run `chmod 600 config.local.php` after every deploy.
 
 ## Before students can register or check in
 
-An admin needs to, via `/admin/classes.php`:
+An admin with feature 1 needs to, via `/admin/classes.php` (and its schedule page):
 1. Create a batch (รุ่น) and open its registration. Only the latest batch (highest number) can
    have its registration opened or closed.
-2. Create a class instance (batch + level) and generate its recurring session schedule. The
-   schedule link (to `/admin/schedule.php`) is shown only for each batch's highest class level.
+2. Create a class instance (batch + level). There's no start date to enter here.
+3. Click its จัดการตารางเรียน link, which opens `/admin/schedule.php` and is shown only for each
+   batch's highest class level. Enter the start date, number of sessions and weekdays to generate
+   the recurring session schedule; individual sessions can be cancelled there. The class's start date
+   shown on both pages is its first non-cancelled session.
 
 CSV-imported students also need their batch to exist first; the import refuses a file that
 references a batch that hasn't been created.
@@ -275,10 +278,14 @@ Production runs the app as a git checkout of this repo, owned by the web server 
 1. Commit and push to `master`.
 2. On the server, back up first if the change touches data:
    `sudo -u www-data php cron/backup.php`
-3. Pull as the web server user so file ownership stays consistent with the cron jobs:
-   `sudo -u www-data git -C <app dir> pull --ff-only`
-4. Apply any new file in `migrations/` (after the backup), once, in name order:
+3. Apply any new file in `migrations/` (after the backup), once, in name order:
    `mysql <db name> < migrations/<file>.sql`. `schema.sql` already includes them for fresh installs.
+   Migrations are written so the code already running keeps working, so apply them **before** the
+   pull: new code may depend on them (e.g. `2026-11-class-start-date-optional.sql` must run before
+   the code that stops writing `class_instances.start_date`). On a host with Git auto-deploy, which
+   publishes on every push, apply them before pushing.
+4. Pull as the web server user so file ownership stays consistent with the cron jobs:
+   `sudo -u www-data git -C <app dir> pull --ff-only`
 5. Lint: `php -l` on the changed files, then smoke-test the affected pages.
 
 Migrations change the schema, so apply them as MySQL root, not the app's restricted user. nginx is

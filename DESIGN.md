@@ -193,6 +193,8 @@ CREATE TABLE app_settings (
 `registration_open = TRUE`, the visitor's first view of the landing page in a session
 (`$_SESSION['landing_seen']`) pops up the intake poster (`assets/images/landingpage.jpg`) in a modal
 `<dialog>`. Clicking the poster or ลงทะเบียนเลย opens the form; ปิด, Esc or a backdrop click closes it.
+The landing page itself also shows ลงทะเบียนเลย; both are a large blue button (`.cta-button`) so
+the way in to the form stands out.
 It never appears over the form, an error or the success page. After a successful submit,
 `?success=1` shows the classroom QR code (`assets/images/qr-code7.jpg`) and the foundation's footer
 banner. Fields: prefix
@@ -310,11 +312,21 @@ admin is always active and holds feature 0, so at least one admin who can manage
 remains. Changing an existing admin's feature permissions isn't supported.
 
 ### Feature 1 — Class management
-- Open/close registration (`batches.registration_open`) — only for the latest batch (highest
+Two pages. **`admin/classes.php`** handles batches and class instances:
+- Create a batch; open/close registration (`batches.registration_open`) — only for the latest batch (highest
   `batch_no`); older batches keep their current flag and show no toggle (also enforced server-side).
-- The จัดการตารางเรียน link is shown only for each batch's highest class level.
 - Create a `class_instance` (batch + level). Its start date is not entered here: pages show the
-  date of its first non-cancelled session (`start_date` is a legacy nullable column, unused).
+  date of its first non-cancelled session, or `—` before a schedule exists (`start_date` is a
+  legacy nullable column, unused). The class table also shows each class's number of
+  non-cancelled sessions.
+- The จัดการตารางเรียน link, shown only for each batch's highest class level, opens
+  `admin/schedule.php?class_instance_id=` for that class.
+
+**`admin/schedule.php`** manages one class's sessions. It opens with a summary of the รุ่น, ระดับ, start date
+(first non-cancelled session) and session/cancelled counts. The current-class rule is enforced
+server-side: for any other class the page is read-only and POSTs are refused. Session updates are
+limited to the page's own class, and every POST redirects back to the page, so a refresh can't
+generate the schedule twice. An unknown class ID redirects to `classes.php`.
 - Generate a recurring schedule: given number of sessions, start date, and days-of-week
   (e.g. Tue+Thu), bulk-insert `sessions` rows numbered sequentially.
 - Cancel an individual session (toggle `is_cancelled`) without regenerating the whole series.
@@ -551,7 +563,7 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
 5. **Recurring schedule** — generating a schedule (e.g. every Mon & Thu) produces a concrete
    date for every session number; % complete is based on sessions up to the most recent
    past session's date, not a fixed "today" cutoff.
-6. **Date display** — dates shown to users (class start dates, session dates/dropdowns) are
+6. **Date display** — dates shown to users (class start dates — a class's first non-cancelled session — and session dates/dropdowns) are
    formatted as a short Thai Buddhist Era date, e.g. `17 ก.ย. 69` (day, abbreviated Thai
    month, 2-digit BE year — Gregorian year + 543), with a weekday label where relevant.
    Underlying storage stays Gregorian ISO (`DATE` columns); conversion only happens at
@@ -607,7 +619,8 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
   out shows progress without recording attendance (section 4.2).
 - **Rejected applicants in reports** — added as a second report view (section 5, Feature 3).
 - **Only the current class is offered** — the check-in class dropdown lists only each batch's
-  highest class level, and in Feature 1 the จัดการตารางเรียน link appears only for that level.
+  highest class level, and in Feature 1 the จัดการตารางเรียน link appears only for that level (and `admin/schedule.php`
+  refuses changes to any other class).
   Registration can be opened/closed only for the latest batch (enforced server-side too).
 - **No check-in to future sessions; Asia/Bangkok time** — check-in used to accept any session,
   including future ones, which progress ignores (it counts only sessions already conducted), so
@@ -642,3 +655,12 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
   a Thai province and cleared the old อยู่ต่างประเทศ province value. Captions are Thai only.
 - **Generated admin passwords** — admin create/reset forms default to a browser-generated
   password (Feature 0, section 5) instead of asking the admin to invent one.
+- **Schedule on its own page (2026-11)** — schedule management moved out of `admin/classes.php`
+  into `admin/schedule.php` (Feature 1, section 5). Generating no longer loses sight of the
+  schedule, a refresh can't duplicate it, and the current-class rule is checked server-side.
+- **Class start date comes from the schedule (2026-11)** — creating a class instance no longer
+  asks for a start date, which duplicated the schedule's own start date and could disagree with
+  it. Pages show the first non-cancelled session's date instead. `class_instances.start_date`
+  became nullable and unused (`migrations/2026-11-class-start-date-optional.sql`).
+- **Prominent ลงทะเบียนเลย button (2026-11)** — the landing page's ลงทะเบียนเลย link and the poster's
+  button became a large blue `.cta-button` (section 4.1).
