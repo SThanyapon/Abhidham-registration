@@ -22,6 +22,9 @@
     --row-hover: #eef6ff;
     --admin-link: #f97316;
     --admin-link-hover: #c2410c;
+    --cta: #2563eb;
+    --cta-dark: #1d4ed8;
+    --cta-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
 }
 
 /* Admin pages (<body class="admin">) use an orange theme to stand apart from the public pages */
@@ -427,6 +430,28 @@ button.secondary:hover {
 button.danger {
     background: linear-gradient(135deg, #ef4444, var(--danger-dark));
     box-shadow: 0 2px 8px rgba(220, 38, 38, 0.25);
+}
+
+/* Large blue call-to-action ("ลงทะเบียนเลย" on index.php), for a <button> or a link styled as one */
+.cta-button {
+    display: inline-block;
+    padding: 14px 40px;
+    background: linear-gradient(135deg, var(--cta), var(--cta-dark));
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    font: inherit;
+    font-size: 1.3rem;
+    font-weight: 700;
+    text-decoration: none;
+    box-shadow: var(--cta-shadow);
+    transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
+}
+
+.cta-button:hover {
+    color: #fff;
+    transform: translateY(-1px);
+    filter: brightness(1.08);
 }
 
 /* Alerts */

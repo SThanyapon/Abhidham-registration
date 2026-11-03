@@ -41,7 +41,7 @@ $dayLabels = [
 $classInstanceId = (int) ($_GET['class_instance_id'] ?? 0);
 
 $stmt = $mysqli->prepare(
-    'SELECT ci.id, ci.batch_id, ci.start_date, cl.name AS level_name, cl.sort_order,
+    'SELECT ci.id, ci.batch_id, cl.name AS level_name, cl.sort_order,
             b.batch_no, b.name AS batch_name
      FROM class_instances ci
      JOIN class_levels cl ON cl.id = ci.class_level_id
@@ -143,6 +143,15 @@ $sessions = addDisplayNumbers($stmt->get_result()->fetch_all(MYSQLI_ASSOC));
 $stmt->close();
 
 $cancelledCount = count(array_filter($sessions, fn ($s) => (int) $s['is_cancelled'] === 1));
+
+// The class start date is its first non-cancelled session (sessions are in session_number order).
+$firstSessionDate = null;
+foreach ($sessions as $session) {
+    if ($session['display_number'] !== null) {
+        $firstSessionDate = $session['session_date'];
+        break;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -166,7 +175,7 @@ $cancelledCount = count(array_filter($sessions, fn ($s) => (int) $s['is_cancelle
     <div class="card">
         <p><strong>รุ่น:</strong> <?= htmlspecialchars($class['batch_name'] ?: 'รุ่น ' . $class['batch_no']) ?></p>
         <p><strong>ระดับ:</strong> <?= htmlspecialchars($class['level_name']) ?></p>
-        <p><strong>วันที่เริ่มเรียน:</strong> <?= htmlspecialchars(formatDateBEShort($class['start_date'])) ?></p>
+        <p><strong>วันที่เริ่มเรียน:</strong> <?= $firstSessionDate ? htmlspecialchars(formatDateBEShort($firstSessionDate)) : 'ยังไม่มีตารางเรียน' ?></p>
         <p><strong>จำนวนครั้งทั้งหมด:</strong> <?= count($sessions) - $cancelledCount ?> ครั้ง<?= $cancelledCount > 0 ? ' (ยกเลิก ' . $cancelledCount . ' ครั้ง)' : '' ?></p>
     </div>
 

@@ -64,7 +64,7 @@ function choiceField(array $old, string $field, string $caption, bool $required 
             <div class="action-row">
                 <form class="inline-form" action="index.php" method="get">
                     <input type="hidden" name="register" value="1">
-                    <button type="submit">ลงทะเบียนเลย</button>
+                    <button type="submit" class="cta-button">ลงทะเบียนเลย</button>
                 </form>
                 <button type="button" class="secondary" onclick="this.closest('dialog').close()">ปิด</button>
             </div>
@@ -99,7 +99,7 @@ function choiceField(array $old, string $field, string $caption, bool $required 
 
     <?php if (!$showForm): ?>
         <p>ยินดีต้อนรับ กด "ลงทะเบียน" เพื่อเริ่มลงทะเบียนเรียนพระอภิธรรม</p>
-        <p><a href="index.php?register=1">ลงทะเบียนเลย</a></p>
+        <p><a class="cta-button" href="index.php?register=1">ลงทะเบียนเลย</a></p>
     <?php elseif (!$batch): ?>
         <p class="error">ขณะนี้ปิดรับลงทะเบียน กรุณากลับมาใหม่ภายหลัง</p>
     <?php else: ?>

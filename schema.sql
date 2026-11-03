@@ -20,7 +20,7 @@ CREATE TABLE class_instances (
     id INT AUTO_INCREMENT PRIMARY KEY,
     batch_id INT NOT NULL,
     class_level_id INT NOT NULL,
-    start_date DATE NOT NULL,
+    start_date DATE NULL, -- legacy, no longer written: the start date is the first non-cancelled session
     UNIQUE (batch_id, class_level_id),
     FOREIGN KEY (batch_id) REFERENCES batches(id),
     FOREIGN KEY (class_level_id) REFERENCES class_levels(id)

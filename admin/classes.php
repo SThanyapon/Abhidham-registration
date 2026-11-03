@@ -46,15 +46,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'create_class_instance') {
         $batchId = (int) ($_POST['batch_id'] ?? 0);
         $classLevelId = (int) ($_POST['class_level_id'] ?? 0);
-        $startDate = $_POST['start_date'] ?? '';
 
-        if ($batchId <= 0 || $classLevelId <= 0 || $startDate === '') {
-            $error = 'กรุณาระบุรุ่น ระดับชั้น และวันที่เริ่มเรียน';
+        if ($batchId <= 0 || $classLevelId <= 0) {
+            $error = 'กรุณาระบุรุ่นและระดับชั้น';
         } else {
-            $stmt = $mysqli->prepare(
-                'INSERT INTO class_instances (batch_id, class_level_id, start_date) VALUES (?, ?, ?)'
-            );
-            $stmt->bind_param('iis', $batchId, $classLevelId, $startDate);
+            // The start date comes from the schedule (admin/schedule.php), not from here.
+            $stmt = $mysqli->prepare('INSERT INTO class_instances (batch_id, class_level_id) VALUES (?, ?)');
+            $stmt->bind_param('ii', $batchId, $classLevelId);
             $stmt->execute();
             $stmt->close();
             $notice = 'สร้างห้องเรียนเรียบร้อยแล้ว';
@@ -70,8 +68,9 @@ $classLevels = $mysqli->query('SELECT id, name, sort_order FROM class_levels ORD
     ->fetch_all(MYSQLI_ASSOC);
 
 $classInstances = $mysqli->query(
-    "SELECT ci.id, ci.batch_id, ci.start_date, cl.name AS level_name, cl.sort_order, b.batch_no, b.name AS batch_name,
-            (SELECT COUNT(*) FROM sessions s WHERE s.class_instance_id = ci.id AND s.is_cancelled = 0) AS session_count
+    "SELECT ci.id, ci.batch_id, cl.name AS level_name, cl.sort_order, b.batch_no, b.name AS batch_name,
+            (SELECT COUNT(*) FROM sessions s WHERE s.class_instance_id = ci.id AND s.is_cancelled = 0) AS session_count,
+            (SELECT MIN(s.session_date) FROM sessions s WHERE s.class_instance_id = ci.id AND s.is_cancelled = 0) AS first_session_date
      FROM class_instances ci
      JOIN class_levels cl ON cl.id = ci.class_level_id
      JOIN batches b ON b.id = ci.batch_id
@@ -151,7 +150,7 @@ foreach ($classInstances as $class) {
                 <tr>
                     <td><?= htmlspecialchars($class['batch_name'] ?: 'รุ่น ' . $class['batch_no']) ?></td>
                     <td><?= htmlspecialchars($class['level_name']) ?></td>
-                    <td><?= htmlspecialchars(formatDateBEShort($class['start_date'])) ?></td>
+                    <td><?= $class['first_session_date'] ? htmlspecialchars(formatDateBEShort($class['first_session_date'])) : '—' ?></td>
                     <td><?= (int) $class['session_count'] ?></td>
                     <td>
                         <?php if ((int) $class['sort_order'] === $maxSortByBatch[$class['batch_id']]): ?>
@@ -178,8 +177,6 @@ foreach ($classInstances as $class) {
                 <option value="<?= $level['id'] ?>"><?= htmlspecialchars($level['name']) ?></option>
             <?php endforeach; ?>
         </select>
-        <label for="start_date">วันที่เริ่มเรียน</label>
-        <input type="date" id="start_date" name="start_date" required>
         <button type="submit">สร้างห้องเรียน</button>
     </form>
 

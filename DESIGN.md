@@ -50,7 +50,7 @@ CREATE TABLE class_instances (
     id INT AUTO_INCREMENT PRIMARY KEY,
     batch_id INT NOT NULL REFERENCES batches(id),
     class_level_id INT NOT NULL REFERENCES class_levels(id),
-    start_date DATE NOT NULL,
+    start_date DATE NULL, -- legacy, no longer written: the start date is the first non-cancelled session
     UNIQUE (batch_id, class_level_id)
 );
 
@@ -313,7 +313,8 @@ remains. Changing an existing admin's feature permissions isn't supported.
 - Open/close registration (`batches.registration_open`) — only for the latest batch (highest
   `batch_no`); older batches keep their current flag and show no toggle (also enforced server-side).
 - The จัดการตารางเรียน link is shown only for each batch's highest class level.
-- Create a `class_instance` (batch + level + start date).
+- Create a `class_instance` (batch + level). Its start date is not entered here: pages show the
+  date of its first non-cancelled session (`start_date` is a legacy nullable column, unused).
 - Generate a recurring schedule: given number of sessions, start date, and days-of-week
   (e.g. Tue+Thu), bulk-insert `sessions` rows numbered sequentially.
 - Cancel an individual session (toggle `is_cancelled`) without regenerating the whole series.

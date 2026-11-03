@@ -29,6 +29,7 @@ mysql -u root -p < schema.sql
 mysql -u root -p abhidham_registration < migrations/2026-10-registration-fields.sql
 mysql -u root -p abhidham_registration < migrations/2026-10-heard-from-multi.sql
 mysql -u root -p abhidham_registration < migrations/2026-10-address-country.sql
+mysql -u root -p abhidham_registration < migrations/2026-11-class-start-date-optional.sql
 
 # Create an admin user (feature numbers: 0=manage admins, 1=classes, 2=approvals, 3=reports,
 # 4=promotions, 6=CSV import, 7=edit student, 9=backup; 5 is unused; defaults to all 8)
