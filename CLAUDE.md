@@ -108,7 +108,7 @@ up the intake poster (`assets/images/landingpage.jpg`, a `<dialog>`, flagged by
   and not counting future scheduled sessions) — this is a deliberate business rule, not a bug.
   `addDisplayNumbers()` gives each session the number every UI shows (`display_number`): 1..n over
   the class's non-cancelled sessions in `session_number` order, `null` for cancelled ones, so a
-  cancelled class leaves no gap (`checkin.php`, `admin/classes.php`, `admin/reports.php`). The stored
+  cancelled class leaves no gap (`checkin.php`, `admin/schedule.php`, `admin/reports.php`). The stored
   `session_number` is internal and never changes; un-cancelling a session renumbers the later ones.
 - `backup.php` — `runBackup()`: pure-PHP `SHOW CREATE TABLE` + row dump, gzip-compressed to a
   timestamped `.sql.gz` file under `config.local.php['backup']['directory']` (no dependency on the
@@ -122,7 +122,7 @@ up the intake poster (`assets/images/landingpage.jpg`, a `<dialog>`, flagged by
   `admin/reports.php`.
 - `date_helpers.php` — `formatDateBEShort()`: renders an ISO date as a short Thai Buddhist-Era date
   (e.g. `17 ก.ย. 69` — day, abbreviated Thai month, 2-digit BE year). Used wherever a session/class date
-  is displayed to students or admins (`checkin.php`, `admin/classes.php`, `admin/reports.php`); storage stays Gregorian ISO
+  is displayed to students or admins (`checkin.php`, `admin/classes.php`, `admin/schedule.php`, `admin/reports.php`); storage stays Gregorian ISO
   (`DATE` columns), conversion only happens at display time.
 - `input.php` — whitespace normalization for user input, used instead of bare `trim()` on every
   free-text `$_POST` field: `cleanText()` (trim + collapse internal whitespace, incl. NBSP and
@@ -190,7 +190,8 @@ sessions and get promoted through the fixed level progression
 `class_levels.sort_order`, promotions logged in `promotions`).
 
 **Admin feature numbering** (used throughout `admin_permissions` and `requireFeature()` calls):
-0 = manage admin staff (`admin/admins.php`), 1 = class/schedule management, 2 = enrollment approval,
+0 = manage admin staff (`admin/admins.php`), 1 = class/schedule management (`admin/classes.php` +
+`admin/schedule.php`), 2 = enrollment approval,
 3 = reports, 4 = promotion, 6 = CSV import (`admin/import_students.php`), 7 = edit student details
 (`admin/students.php`), 9 = backup. Number 5 is unused (backup was moved from 5 to 9), and the
 dashboard lists links in that numeric order. Access to each is granted per-admin-user independently,
@@ -208,7 +209,9 @@ permissions can't be edited after creation.
 "Current class" rules (deliberate, keep them consistent): a batch's current class is its
 class_instance with the highest `class_levels.sort_order`. `checkin.php` offers only that class per
 batch, and only sessions dated today or earlier (future check-ins are refused server-side too).
-`admin/classes.php` shows the จัดการตารางเรียน link only for that class, and allows opening/closing
+`admin/classes.php` shows the จัดการตารางเรียน link (to `admin/schedule.php?class_instance_id=`) only
+for that class; `admin/schedule.php` enforces the same rule server-side (other classes are read-only)
+and redirects after each POST so a refresh can't generate the schedule twice. `classes.php` allows opening/closing
 registration only for the latest batch (highest `batch_no`, also enforced in the POST handler).
 
 `admin/import_students.php` (feature 6): CSV-imported students skip approval. They're inserted as

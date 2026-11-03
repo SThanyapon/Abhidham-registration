@@ -520,6 +520,7 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
 │   ├── dashboard.php
 │   ├── admins.php         (feature 0)
 │   ├── classes.php        (feature 1)
+│   ├── schedule.php       (feature 1, sessions of one class instance)
 │   ├── approvals.php      (feature 2)
 │   ├── reports.php        (feature 3)
 │   ├── promotions.php     (feature 4)

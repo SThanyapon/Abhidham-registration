@@ -57,7 +57,7 @@ original requirements.
      | # | Page | Feature |
      |---|------|---------|
      | 0 | `admin/admins.php` | Manage admins: create, reset password, enable/disable, delete |
-     | 1 | `admin/classes.php` | Batches, class instances and session schedules |
+     | 1 | `admin/classes.php`, `admin/schedule.php` | Batches and class instances; session schedule per class |
      | 2 | `admin/approvals.php` | Approve/reject registrations (assigns student IDs) |
      | 3 | `admin/reports.php` | Attendance and rejected-applicant reports, filter by รุ่น/ระดับชั้น, CSV export |
      | 4 | `admin/promotions.php` | Promote students to the next level |
@@ -222,7 +222,7 @@ An admin needs to, via `/admin/classes.php`:
 1. Create a batch (รุ่น) and open its registration. Only the latest batch (highest number) can
    have its registration opened or closed.
 2. Create a class instance (batch + level) and generate its recurring session schedule. The
-   schedule link is shown only for each batch's highest class level.
+   schedule link (to `/admin/schedule.php`) is shown only for each batch's highest class level.
 
 CSV-imported students also need their batch to exist first; the import refuses a file that
 references a batch that hasn't been created.
