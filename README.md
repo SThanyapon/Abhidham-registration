@@ -177,7 +177,10 @@ The app needs no code changes, only:
    `expose_php` and `display_errors` off, `log_errors` on with `error_log` in a folder outside
    `public_html`, lower `upload_max_filesize`/`post_max_size` to a few MB (the CSV import is the
    only upload), and raise `session.gc_maxlifetime` to 3600 so admin sessions aren't purged before
-   the app's 1-hour idle timeout.
+   the app's 1-hour idle timeout. On Hostinger (CloudLinux PHP Selector) the same options can be set
+   over SSH, for web and CLI alike: `selectorctl --version=8.5 --add-options=session.gc_maxlifetime:3600,expose_php:Off,log_errors:On,display_errors:Off,upload_max_filesize:1024M,post_max_size:1024M`.
+   The selector may offer nothing below 1024M for uploads and no `error_log` setting; errors then
+   go to `error_log` files next to the failing script, which the `.htaccess` allowlist never serves.
 2. **Code**: `git clone` the repo (public, HTTPS) into the domain's `public_html`. The repo's
    `.htaccess` is the nginx allowlist for Apache/LiteSpeed: only the four public pages,
    `admin/*.php` and static files under `assets/` are served, everything else is 404, and HTTP
@@ -193,6 +196,9 @@ The app needs no code changes, only:
    hourly and `/usr/bin/php <app dir>/cron/backup.php` weekly, each appending `>> <log dir>/<job>.log 2>&1`
    to a log folder outside `public_html` (mode 700). The panel schedules in **server time, which is
    often UTC** (`date` over SSH), not Bangkok time: Saturday 23:00 Bangkok is `0 16 * * 6` in UTC.
+   Hostinger's cron creates the log file but its output may never reach it, so an empty log is
+   not a failure: check the effect instead (a `backup_runs` row with `triggered_by = scheduled`,
+   or an expired `otp_codes` row gone after the next hour).
 6. **SSL**: enable the panel's free certificate. If a CDN sits in front, confirm `REMOTE_ADDR` is
    still the visitor's IP (rate limiting keys on it), or turn the CDN off. Connecting a new domain
    to the site moves it to `domains/<new domain>/public_html`: update the cron paths and re-check
@@ -204,7 +210,8 @@ The app needs no code changes, only:
 8. **Check from outside** as in step 10 above.
 
 Deploying there is `git pull --ff-only` in the app directory as the account user (no
-`sudo -u www-data`); migrations run with the panel's database user. If the panel's Git
+`sudo -u www-data`), then `chmod 600 config.local.php` and `php -l` on the changed files;
+migrations run with the panel's database user. If the panel's Git
 auto-deploy is enabled instead, every push to `master` goes live within seconds, so protect the
 GitHub account (2FA) and the `master` branch. Hostinger's publish step resets `config.local.php`
 to 644, so run `chmod 600 config.local.php` after every deploy.
