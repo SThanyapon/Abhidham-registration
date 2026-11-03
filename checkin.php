@@ -61,12 +61,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'รหัสนักศึกษา หรือชื่อ-นามสกุลไม่ตรงกับข้อมูลในระบบ';
             } else {
                 $currentClassId = studentClassInstanceId($mysqli, (int) $student['id']);
+                $currentClassClosed = false;
+                if ($currentClassId !== null) {
+                    $closedStmt = $mysqli->prepare('SELECT is_closed FROM class_instances WHERE id = ?');
+                    $closedStmt->bind_param('i', $currentClassId);
+                    $closedStmt->execute();
+                    $currentClassClosed = (bool) $closedStmt->get_result()->fetch_assoc()['is_closed'];
+                    $closedStmt->close();
+                }
 
                 if ($currentClassId === null) {
                     $notice = 'ยังไม่มีตารางเรียนสำหรับชั้นเรียนปัจจุบันของท่าน';
                 } elseif ($classInstanceId > 0 && $sessionId > 0) {
                     // Check-in mode: both class and session chosen.
-                    if ($classInstanceId !== $currentClassId) {
+                    if ($currentClassClosed) {
+                        // A closed class (admin/classes.php) takes no more check-ins; progress still shows.
+                        $error = 'ห้องเรียนนี้ปิดแล้ว ไม่สามารถลงชื่อเข้าเรียนได้';
+                    } elseif ($classInstanceId !== $currentClassId) {
                         $error = 'ชั้นเรียนที่เลือกไม่ตรงกับชั้นเรียนปัจจุบันของท่าน';
                     } else {
                         $sessionStmt = $mysqli->prepare(
@@ -102,6 +113,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             }
                         }
                     }
+                } elseif ($currentClassClosed) {
+                    // View-only mode for a closed class: nothing to check in to any more.
+                    $notice = 'แสดงความก้าวหน้าการเข้าเรียน (ห้องเรียนนี้ปิดแล้ว ไม่สามารถลงชื่อเข้าเรียนได้)';
                 } else {
                     // View-only mode: class or session not chosen, so nothing is written.
                     $notice = 'แสดงความก้าวหน้าการเข้าเรียน (ยังไม่ได้บันทึกการลงชื่อเข้าเรียน — '
@@ -116,13 +130,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Only each batch's highest class level (its current class) is offered for check-in.
+// Only each batch's highest class level (its current class) is offered for check-in, and only
+// while it's open: a batch whose current class is closed offers nothing (no fallback to an older one).
 $classes = $mysqli->query(
     "SELECT ci.id, cl.name AS level_name, b.batch_no, b.name AS batch_name
      FROM class_instances ci
      JOIN class_levels cl ON cl.id = ci.class_level_id
      JOIN batches b ON b.id = ci.batch_id
-     WHERE cl.sort_order = (
+     WHERE ci.is_closed = 0
+       AND cl.sort_order = (
          SELECT MAX(cl2.sort_order)
          FROM class_instances ci2
          JOIN class_levels cl2 ON cl2.id = ci2.class_level_id

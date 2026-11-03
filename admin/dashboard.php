@@ -34,7 +34,7 @@ $stmt->close();
             <a href="admins.php">0) จัดการผู้ดูแลระบบ</a>
         <?php endif; ?>
         <?php if (in_array(1, $features, true)): ?>
-            <a href="classes.php">1) จัดการชั้นเรียนและตารางเรียน</a>
+            <a href="batches.php">1) จัดการรุ่น ห้องเรียน และตารางเรียน</a>
         <?php endif; ?>
         <?php if (in_array(2, $features, true)): ?>
             <a href="approvals.php">2) อนุมัติการลงทะเบียน</a>

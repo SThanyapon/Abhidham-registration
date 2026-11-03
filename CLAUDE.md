@@ -30,6 +30,7 @@ mysql -u root -p abhidham_registration < migrations/2026-10-registration-fields.
 mysql -u root -p abhidham_registration < migrations/2026-10-heard-from-multi.sql
 mysql -u root -p abhidham_registration < migrations/2026-10-address-country.sql
 mysql -u root -p abhidham_registration < migrations/2026-11-class-start-date-optional.sql
+mysql -u root -p abhidham_registration < migrations/2026-11-class-closed.sql
 
 # Create an admin user (feature numbers: 0=manage admins, 1=classes, 2=approvals, 3=reports,
 # 4=promotions, 6=CSV import, 7=edit student, 9=backup; 5 is unused; defaults to all 8)
@@ -47,9 +48,9 @@ php scripts/normalize_whitespace.php
 
 First-time setup requires copying `config.local.php.example` to `config.local.php` (gitignored) and
 filling in DB/SMTP credentials — `includes/db.php` calls `die()` if it's missing. Before students can
-register or check in, an admin must open a batch's registration and create a class instance via
-`/admin/classes.php`, then generate its schedule on `/admin/schedule.php` (the จัดการตารางเรียน link;
-see README.md). README.md also has the full production installation for a
+register or check in, an admin must open a batch's registration on `/admin/batches.php`, create a
+class instance on `/admin/classes.php` (the batch's จัดการห้องเรียน link), then generate its schedule
+on `/admin/schedule.php` (the จัดการตารางเรียน link; see README.md). README.md also has the full production installation for a
 Linux server (nginx allowlist + PHP-FPM, certbot, dedicated MySQL user, www-data cron, php.ini), the
 shared-hosting variant (hPanel database/cron, `.htaccess`, cron schedules in server time — often UTC)
 and the deploy procedure (`git pull --ff-only` on the server).
@@ -195,8 +196,8 @@ sessions and get promoted through the fixed level progression
 `class_levels.sort_order`, promotions logged in `promotions`).
 
 **Admin feature numbering** (used throughout `admin_permissions` and `requireFeature()` calls):
-0 = manage admin staff (`admin/admins.php`), 1 = class/schedule management (`admin/classes.php` +
-`admin/schedule.php`), 2 = enrollment approval,
+0 = manage admin staff (`admin/admins.php`), 1 = class/schedule management (`admin/batches.php` +
+`admin/classes.php` + `admin/schedule.php`), 2 = enrollment approval,
 3 = reports, 4 = promotion, 6 = CSV import (`admin/import_students.php`), 7 = edit student details
 (`admin/students.php`), 9 = backup. Number 5 is unused (backup was moved from 5 to 9), and the
 dashboard lists links in that numeric order. Access to each is granted per-admin-user independently,
@@ -213,15 +214,24 @@ permissions can't be edited after creation.
 
 "Current class" rules (deliberate, keep them consistent): a batch's current class is its
 class_instance with the highest `class_levels.sort_order`. `checkin.php` offers only that class per
-batch, and only sessions dated today or earlier (future check-ins are refused server-side too).
+batch, only while it's open (`is_closed = 0`; a closed current class leaves the batch with nothing
+to offer, no fallback to an older class), and only sessions dated today or earlier (future and
+closed-class check-ins are refused server-side too).
 `admin/classes.php` shows the จัดการตารางเรียน link (to `admin/schedule.php?class_instance_id=`) only
-for that class; `admin/schedule.php` enforces the same rule server-side (other classes are read-only)
-and redirects after each POST so a refresh can't generate the schedule twice. `classes.php` allows opening/closing
-registration only for the latest batch (highest `batch_no`, also enforced in the POST handler).
+for that class; `admin/schedule.php` enforces the same rule server-side (other classes and closed
+classes are read-only) and redirects after each POST so a refresh can't generate the schedule
+twice. `batches.php` allows opening/closing registration only for the latest batch (highest
+`batch_no`, also enforced in the POST handler).
 
-Feature 1 is two pages. `admin/classes.php` handles batches (create, registration toggle) and class
-instances (created with รุ่น + ระดับ only; the table shows each class's start date and number of
-non-cancelled sessions). `admin/schedule.php?class_instance_id=` generates a class's sessions and
+Feature 1 is three pages, รุ่น → ห้องเรียน → ตารางเรียน. `admin/batches.php` handles batches (create,
+registration toggle) and links each batch to its classes. `admin/classes.php` (optional
+`?batch_id=` filter, which also preselects the create form's batch; unknown ID = all classes)
+handles class instances: created with รุ่น + ระดับ only, the table shows each class's start date,
+number of non-cancelled sessions and open/closed status. Any class can be closed (`ปิดห้องเรียน`,
+`class_instances.is_closed`, `migrations/2026-11-class-closed.sql`) once the batch finishes that
+level, and reopened. A closed class takes no check-ins and its schedule is read-only, but students
+still see their progress on `checkin.php`. The close form posts the target value explicitly and the
+page redirects after each POST. `admin/schedule.php?class_instance_id=` generates a class's sessions and
 cancels/un-cancels them; an unknown ID redirects back to `classes.php`. A class's start date is
 always its **first non-cancelled session's date**, derived in both pages (`—` / ยังไม่มีตารางเรียน
 when there's no schedule). `class_instances.start_date` is a legacy nullable column

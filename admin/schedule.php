@@ -41,7 +41,7 @@ $dayLabels = [
 $classInstanceId = (int) ($_GET['class_instance_id'] ?? 0);
 
 $stmt = $mysqli->prepare(
-    'SELECT ci.id, ci.batch_id, cl.name AS level_name, cl.sort_order,
+    'SELECT ci.id, ci.batch_id, ci.is_closed, cl.name AS level_name, cl.sort_order,
             b.batch_no, b.name AS batch_name
      FROM class_instances ci
      JOIN class_levels cl ON cl.id = ci.class_level_id
@@ -70,14 +70,20 @@ $stmt->execute();
 $isCurrentClass = (int) $stmt->get_result()->fetch_assoc()['max_sort'] === (int) $class['sort_order'];
 $stmt->close();
 
-$selfUrl = 'schedule.php?class_instance_id=' . $classInstanceId;
+// A closed class (admin/classes.php) keeps its schedule but can't be edited.
+$isClosed = (bool) $class['is_closed'];
+$isReadOnly = $isClosed || !$isCurrentClass;
+
+$selfUrl ='schedule.php?class_instance_id=' . $classInstanceId;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
     $action = $_POST['action'] ?? '';
     $notice = null;
 
-    if (!$isCurrentClass) {
+    if ($isClosed) {
+        $error = 'ห้องเรียนนี้ปิดแล้ว จึงแก้ไขตารางเรียนไม่ได้';
+    } elseif (!$isCurrentClass) {
         $error = 'จัดการตารางเรียนได้เฉพาะชั้นเรียนปัจจุบันของรุ่นเท่านั้น';
     } elseif ($action === 'generate_schedule') {
         $startDate = $_POST['schedule_start_date'] ?? '';
@@ -167,7 +173,7 @@ foreach ($sessions as $session) {
 <body class="admin">
     <h1>จัดการตารางเรียน</h1>
     <nav>
-        <a href="classes.php">กลับหน้าจัดการชั้นเรียน</a>
+        <a href="classes.php?batch_id=<?= (int) $class['batch_id'] ?>">กลับหน้าจัดการห้องเรียน</a>
         <a href="dashboard.php">กลับหน้าแผงควบคุม</a>
         <form class="nav-logout" action="logout.php" method="post"><?= csrfField() ?><button type="submit">ออกจากระบบ</button></form>
     </nav>
@@ -175,6 +181,7 @@ foreach ($sessions as $session) {
     <div class="card">
         <p><strong>รุ่น:</strong> <?= htmlspecialchars($class['batch_name'] ?: 'รุ่น ' . $class['batch_no']) ?></p>
         <p><strong>ระดับ:</strong> <?= htmlspecialchars($class['level_name']) ?></p>
+        <p><strong>สถานะห้องเรียน:</strong> <?= $isClosed ? 'ปิดแล้ว' : 'เปิด' ?></p>
         <p><strong>วันที่เริ่มเรียน:</strong> <?= $firstSessionDate ? htmlspecialchars(formatDateBEShort($firstSessionDate)) : 'ยังไม่มีตารางเรียน' ?></p>
         <p><strong>จำนวนครั้งทั้งหมด:</strong> <?= count($sessions) - $cancelledCount ?> ครั้ง<?= $cancelledCount > 0 ? ' (ยกเลิก ' . $cancelledCount . ' ครั้ง)' : '' ?></p>
     </div>
@@ -182,7 +189,9 @@ foreach ($sessions as $session) {
     <?php if ($notice): ?><p class="success"><?= htmlspecialchars($notice) ?></p><?php endif; ?>
     <?php if ($error): ?><p class="error"><?= htmlspecialchars($error) ?></p><?php endif; ?>
 
-    <?php if (!$isCurrentClass): ?>
+    <?php if ($isClosed): ?>
+        <p class="notice">ห้องเรียนนี้ปิดแล้ว จึงดูตารางเรียนได้อย่างเดียว (เปิดห้องเรียนได้ที่หน้าจัดการห้องเรียน)</p>
+    <?php elseif (!$isCurrentClass): ?>
         <p class="notice">ชั้นเรียนนี้ไม่ใช่ชั้นเรียนปัจจุบันของรุ่น จึงดูตารางเรียนได้อย่างเดียว</p>
     <?php else: ?>
         <h2>สร้างตารางเรียน</h2>
@@ -231,9 +240,9 @@ foreach ($sessions as $session) {
                     <span><?= htmlspecialchars(dayOfWeekLabel($session['session_date'], $dayLabels)) ?></span>
                     <span><?= htmlspecialchars(formatDateBEShort($session['session_date'])) ?></span>
                     <label class="checkbox-label">
-                        <input type="checkbox" name="is_cancelled" <?= $session['is_cancelled'] ? 'checked' : '' ?><?= $isCurrentClass ? '' : ' disabled' ?>> ยกเลิกตารางเรียน
+                        <input type="checkbox" name="is_cancelled" <?= $session['is_cancelled'] ? 'checked' : '' ?><?= $isReadOnly ? ' disabled' : '' ?>> ยกเลิกตารางเรียน
                     </label>
-                    <button type="submit" class="secondary"<?= $isCurrentClass ? '' : ' disabled' ?>>บันทึก</button>
+                    <button type="submit" class="secondary"<?= $isReadOnly ? ' disabled' : '' ?>>บันทึก</button>
                 </form>
             <?php endforeach; ?>
         </div>

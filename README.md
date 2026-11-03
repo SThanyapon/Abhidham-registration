@@ -57,7 +57,7 @@ original requirements.
      | # | Page | Feature |
      |---|------|---------|
      | 0 | `admin/admins.php` | Manage admins: create, reset password, enable/disable, delete |
-     | 1 | `admin/classes.php`, `admin/schedule.php` | Batches and class instances; session schedule per class |
+     | 1 | `admin/batches.php`, `admin/classes.php`, `admin/schedule.php` | Batches; class instances (open/close); session schedule per class |
      | 2 | `admin/approvals.php` | Approve/reject registrations (assigns student IDs) |
      | 3 | `admin/reports.php` | Attendance and rejected-applicant reports, filter by รุ่น/ระดับชั้น, CSV export |
      | 4 | `admin/promotions.php` | Promote students to the next level |
@@ -218,14 +218,19 @@ to 644, so run `chmod 600 config.local.php` after every deploy.
 
 ## Before students can register or check in
 
-An admin with feature 1 needs to, via `/admin/classes.php` (and its schedule page):
+An admin with feature 1 needs to, starting from `/admin/batches.php` (dashboard link 1):
 1. Create a batch (รุ่น) and open its registration. Only the latest batch (highest number) can
    have its registration opened or closed.
-2. Create a class instance (batch + level). There's no start date to enter here.
+2. Click the batch's จัดการห้องเรียน link (`/admin/classes.php?batch_id=`) and create a class
+   instance (batch + level). There's no start date to enter here.
 3. Click its จัดการตารางเรียน link, which opens `/admin/schedule.php` and is shown only for each
    batch's highest class level. Enter the start date, number of sessions and weekdays to generate
    the recurring session schedule; individual sessions can be cancelled there. The class's start date
    shown on both pages is its first non-cancelled session.
+
+When a batch finishes a level, close that class on `/admin/classes.php` (ปิดห้องเรียน): students can
+no longer check in to it (they can still view their progress) and its schedule becomes read-only.
+It can be reopened from the same page.
 
 CSV-imported students also need their batch to exist first; the import refuses a file that
 references a batch that hasn't been created.
@@ -282,7 +287,8 @@ Production runs the app as a git checkout of this repo, owned by the web server 
    `mysql <db name> < migrations/<file>.sql`. `schema.sql` already includes them for fresh installs.
    Migrations are written so the code already running keeps working, so apply them **before** the
    pull: new code may depend on them (e.g. `2026-11-class-start-date-optional.sql` must run before
-   the code that stops writing `class_instances.start_date`). On a host with Git auto-deploy, which
+   the code that stops writing `class_instances.start_date`, and `2026-11-class-closed.sql` before
+   the code that reads `class_instances.is_closed`). On a host with Git auto-deploy, which
    publishes on every push, apply them before pushing.
 4. Pull as the web server user so file ownership stays consistent with the cron jobs:
    `sudo -u www-data git -C <app dir> pull --ff-only`

@@ -21,6 +21,7 @@ CREATE TABLE class_instances (
     batch_id INT NOT NULL,
     class_level_id INT NOT NULL,
     start_date DATE NULL, -- legacy, no longer written: the start date is the first non-cancelled session
+    is_closed BOOLEAN NOT NULL DEFAULT FALSE, -- closed ห้องเรียน: no check-ins, schedule read-only
     UNIQUE (batch_id, class_level_id),
     FOREIGN KEY (batch_id) REFERENCES batches(id),
     FOREIGN KEY (class_level_id) REFERENCES class_levels(id)

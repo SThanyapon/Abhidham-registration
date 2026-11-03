@@ -51,6 +51,7 @@ CREATE TABLE class_instances (
     batch_id INT NOT NULL REFERENCES batches(id),
     class_level_id INT NOT NULL REFERENCES class_levels(id),
     start_date DATE NULL, -- legacy, no longer written: the start date is the first non-cancelled session
+    is_closed BOOLEAN NOT NULL DEFAULT FALSE, -- closed once the level is finished: no check-ins, schedule read-only
     UNIQUE (batch_id, class_level_id)
 );
 
@@ -312,19 +313,29 @@ admin is always active and holds feature 0, so at least one admin who can manage
 remains. Changing an existing admin's feature permissions isn't supported.
 
 ### Feature 1 — Class management
-Two pages. **`admin/classes.php`** handles batches and class instances:
+Three pages, รุ่น → ห้องเรียน → ตารางเรียน.
+
+**`admin/batches.php`** (รุ่น):
 - Create a batch; open/close registration (`batches.registration_open`) — only for the latest batch (highest
   `batch_no`); older batches keep their current flag and show no toggle (also enforced server-side).
-- Create a `class_instance` (batch + level). Its start date is not entered here: pages show the
-  date of its first non-cancelled session, or `—` before a schedule exists (`start_date` is a
-  legacy nullable column, unused). The class table also shows each class's number of
-  non-cancelled sessions.
+- Each batch row links to its classes (จัดการห้องเรียน, with the class count).
+
+**`admin/classes.php`** (ห้องเรียน), optionally filtered by `?batch_id=` (an unknown ID shows every class):
+- Create a `class_instance` (batch + level; the filtered batch is preselected). Its start date is
+  not entered here: pages show the date of its first non-cancelled session, or `—` before a
+  schedule exists (`start_date` is a legacy nullable column, unused). The class table also shows
+  each class's number of non-cancelled sessions and its status (เปิด / ปิดแล้ว).
+- Close a class (`class_instances.is_closed`) once the batch has finished that level, or reopen it.
+  Any class can be closed. A closed class is left out of the check-in dropdown, check-ins to it
+  are refused server-side, and its schedule is read-only; students can still view their progress
+  on `checkin.php`. The form posts the target state explicitly and the page redirects after each
+  POST, so a refresh can't flip it back.
 - The จัดการตารางเรียน link, shown only for each batch's highest class level, opens
   `admin/schedule.php?class_instance_id=` for that class.
 
 **`admin/schedule.php`** manages one class's sessions. It opens with a summary of the รุ่น, ระดับ, start date
 (first non-cancelled session) and session/cancelled counts. The current-class rule is enforced
-server-side: for any other class the page is read-only and POSTs are refused. Session updates are
+server-side: for any other class, or a closed one, the page is read-only and POSTs are refused. Session updates are
 limited to the page's own class, and every POST redirects back to the page, so a refresh can't
 generate the schedule twice. An unknown class ID redirects to `classes.php`.
 - Generate a recurring schedule: given number of sessions, start date, and days-of-week
@@ -532,7 +543,8 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
 │   ├── logout.php          (POST only)
 │   ├── dashboard.php
 │   ├── admins.php         (feature 0)
-│   ├── classes.php        (feature 1)
+│   ├── batches.php        (feature 1, รุ่น)
+│   ├── classes.php        (feature 1, ห้องเรียน)
 │   ├── schedule.php       (feature 1, sessions of one class instance)
 │   ├── approvals.php      (feature 2)
 │   ├── reports.php        (feature 3)
@@ -664,3 +676,7 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
   became nullable and unused (`migrations/2026-11-class-start-date-optional.sql`).
 - **Prominent ลงทะเบียนเลย button (2026-11)** — the landing page's ลงทะเบียนเลย link and the poster's
   button became a large blue `.cta-button` (section 4.1).
+- **รุ่น → ห้องเรียน → ตารางเรียน, closing a class (2026-11)** — class management split into three
+  pages: batches moved to `admin/batches.php`, and `admin/classes.php` now holds only class
+  instances (Feature 1, section 5). A class can be closed once its level is finished, which stops
+  check-ins and freezes its schedule (`migrations/2026-11-class-closed.sql`).
