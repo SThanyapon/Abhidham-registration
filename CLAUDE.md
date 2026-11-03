@@ -33,7 +33,7 @@ mysql -u root -p abhidham_registration < migrations/2026-11-class-start-date-opt
 mysql -u root -p abhidham_registration < migrations/2026-11-class-closed.sql
 mysql -u root -p abhidham_registration < migrations/2026-11-class-level-full-names.sql
 
-# Create an admin user (feature numbers: 0=manage admins, 1=classes, 2=approvals, 3=reports,
+# Create an admin user (feature numbers: 0=manage admins, 1=batches/classes/schedule, 2=approvals, 3=reports,
 # 4=promotions, 6=CSV import, 7=edit student, 9=backup; 5 is unused; defaults to all 8)
 php scripts/create_admin.php <username> <email> <password> [0,1,2,3,4,6,7,9]
 

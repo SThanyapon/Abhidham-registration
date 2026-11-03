@@ -33,7 +33,7 @@ original requirements.
    ```
    php scripts/create_admin.php <username> <email> <password> 0,1,2,3,4,6,7,9
    ```
-   Feature numbers: 0=manage admins, 1=classes, 2=approvals, 3=reports, 4=promotions, 6=CSV import,
+   Feature numbers: 0=manage admins, 1=batches/classes/schedule, 2=approvals, 3=reports, 4=promotions, 6=CSV import,
    7=edit student, 9=backup (defaults to all 8; 5 is unused). After that, more admin staff can be added
    from `/admin/admins.php` (feature 0).
 4. Run a local PHP server:
@@ -47,8 +47,9 @@ original requirements.
      open, the first visit in a browser session pops up the intake poster (`assets/images/landingpage.jpg`); after submitting, the page shows
      the classroom QR code (`assets/images/qr-code7.jpg`). Replace those images for a new intake.
    - `/checkin.php` — "ลงชื่อ/ตรวจสอบการเข้าเรียน": student ID + name, then pick a class (each
-     batch's current, highest class) and a session dated today or earlier to check in, or leave
-     them blank to just view attendance progress
+     batch's current, highest class, while it isn't closed) and a session dated today or earlier
+     to check in, or leave them blank to just view attendance progress. The result card shows the
+     student's current ชั้นเรียน; picking a class that isn't theirs is refused with no progress shown
    - `/lookup.php` — find a student ID (and current ระดับชั้น) by name; also tells
      pending/rejected applicants their registration status
    - `/admin/login.php` — admin backend (username/password, then an emailed OTP code). The
@@ -59,7 +60,7 @@ original requirements.
      | 0 | `admin/admins.php` | Manage admins: create, reset password, enable/disable, delete |
      | 1 | `admin/batches.php`, `admin/classes.php`, `admin/schedule.php` | Batches; class instances (open/close); session schedule per class |
      | 2 | `admin/approvals.php` | Approve/reject registrations (assigns student IDs) |
-     | 3 | `admin/reports.php` | Attendance and rejected-applicant reports, filter by รุ่น/ระดับชั้น, CSV export |
+     | 3 | `admin/reports.php` | Attendance and rejected-applicant reports, filter by รุ่น/ระดับชั้น, per-session check-in matrix by ห้องเรียน, CSV export |
      | 4 | `admin/promotions.php` | Promote students to the next level |
      | 6 | `admin/import_students.php` | Import already-approved students from CSV (their batches must exist) |
      | 7 | `admin/students.php` | Edit one student's details (by student ID + name) |

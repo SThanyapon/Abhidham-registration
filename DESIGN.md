@@ -244,7 +244,7 @@ Menu caption "ลงชื่อ/ตรวจสอบการเข้าเ�
 Student enters student ID, then name-surname (both **required**, marked `*`; the ID comes first
 since students remember it more reliably than the exact registered spelling of their name), and
 optionally a class (the dropdown lists only each batch's highest class level, i.e. its current
-class) and then **selects the ครั้งที่ (session) themselves** from a dropdown of that
+class, and only while that class isn't closed in Feature 1) and then **selects the ครั้งที่ (session) themselves** from a dropdown of that
 class's sessions, shown in short Thai Buddhist Era date format (e.g. `17 ก.ย. 69`; no
 auto-detection by date). Only sessions dated today or earlier (Asia/Bangkok) are listed, and the
 server refuses a check-in for a future-dated session. System:
@@ -414,14 +414,16 @@ all approved students at once:
 วันที่สมัคร (BE short date). Sortable by prefix/name/batch/date, newest first by default. Rejected rows have no
 `student_no` or `current_class_level_id`, so this view queries without the `class_levels` join.
 
-**Filters** — a รุ่น dropdown (both views) and a ระดับชั้น dropdown (current level; approved view
-only), `?batch_id=` / `?level_id=`, default all. They narrow the summary table, the student
-dropdown and the CSV export, and are kept across sorting and view switching (ระดับชั้น is dropped
-on the rejected view). Changing a filter resets the student selection to all students.
+**Filters** — a รุ่น dropdown (both views), a ระดับชั้น dropdown (current level; approved view
+only) and a ห้องเรียน dropdown (approved view only), `?batch_id=` / `?level_id=` /
+`?class_instance_id=`, default all. They narrow the summary table, the student dropdown and the
+CSV export, and are kept across sorting and view switching (ระดับชั้น and ห้องเรียน are dropped on
+the rejected view). Changing a filter resets the student selection to all students; changing รุ่น
+or ระดับชั้น also clears ห้องเรียน.
 
 Every view can be exported to CSV (`?export=csv`, carrying the current view, filters, sort and student
-selection) — session-by-session for a single student, the summary table for all students, or the
-rejected list. UTF-8 BOM-prefixed so Thai text renders correctly in Excel. Data rows go through
+selection) — session-by-session for a single student, the per-session matrix for a chosen
+ห้องเรียน, the summary table for all students, or the rejected list. UTF-8 BOM-prefixed so Thai text renders correctly in Excel. Data rows go through
 `csvSafe()` (`includes/input.php`), which prefixes `'` to any value starting with `= + - @`, so
 applicant free text can't run as a spreadsheet formula.
 
@@ -643,7 +645,7 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
   out shows progress without recording attendance (section 4.2).
 - **Rejected applicants in reports** — added as a second report view (section 5, Feature 3).
 - **Only the current class is offered** — the check-in class dropdown lists only each batch's
-  highest class level, and in Feature 1 the จัดการตารางเรียน link appears only for that level (and `admin/schedule.php`
+  highest class level (and, since 2026-11, only while it isn't closed), and in Feature 1 the จัดการตารางเรียน link appears only for that level (and `admin/schedule.php`
   refuses changes to any other class).
   Registration can be opened/closed only for the latest batch (enforced server-side too).
 - **No check-in to future sessions; Asia/Bangkok time** — check-in used to accept any session,
