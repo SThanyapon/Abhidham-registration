@@ -31,6 +31,7 @@ mysql -u root -p abhidham_registration < migrations/2026-10-heard-from-multi.sql
 mysql -u root -p abhidham_registration < migrations/2026-10-address-country.sql
 mysql -u root -p abhidham_registration < migrations/2026-11-class-start-date-optional.sql
 mysql -u root -p abhidham_registration < migrations/2026-11-class-closed.sql
+mysql -u root -p abhidham_registration < migrations/2026-11-class-level-full-names.sql
 
 # Create an admin user (feature numbers: 0=manage admins, 1=classes, 2=approvals, 3=reports,
 # 4=promotions, 6=CSV import, 7=edit student, 9=backup; 5 is unused; defaults to all 8)
@@ -193,7 +194,10 @@ sessions. Students enroll into a batch as `pending`, get approved (which assigns
 `current_class_level_id`), or are imported from CSV straight as `approved`; they then check in to
 sessions and get promoted through the fixed level progression
 `จูฬตรี → จูฬโท → จูฬเอก → มัชฌิมตรี → มัชฌิมโท → มัชฌิมเอก → มหาตรี → มหาโท → มหาเอก` (order enforced by
-`class_levels.sort_order`, promotions logged in `promotions`).
+`class_levels.sort_order`, promotions logged in `promotions`). These are the short names; the
+stored and displayed `class_levels.name` is the full title with the short name in brackets, e.g.
+`จูฬอาภิธรรมิกะตรี (จูฬตรี)` (`migrations/2026-11-class-level-full-names.sql`). Code never matches on
+the name, only on `sort_order`.
 
 **Admin feature numbering** (used throughout `admin_permissions` and `requireFeature()` calls):
 0 = manage admin staff (`admin/admins.php`), 1 = class/schedule management (`admin/batches.php` +

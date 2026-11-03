@@ -17,7 +17,8 @@ data model, feature breakdown, and folder structure for the PHP + MySQL implemen
 - **รุ่น (Batch/Cohort)** — a numbered intake (e.g. รุ่น 7). Drives the leading digit of the
   student ID and which registration form is currently open.
 - **Class / Level** — a study level. Fixed progression path:
-  `จูฬตรี → จูฬโท → จูฬเอก → มัชฌิมตรี → มัชฌิมโท → มัชฌิมเอก → มหาตรี → มหาโท → มหาเอก`.
+  `จูฬตรี → จูฬโท → จูฬเอก → มัชฌิมตรี → มัชฌิมโท → มัชฌิมเอก → มหาตรี → มหาโท → มหาเอก`
+  (short names; pages show the full title, e.g. `จูฬอาภิธรรมิกะตรี (จูฬตรี)`).
   New registrations always start at `จูฬตรี` (requirement #14). Students imported from CSV
   (Feature 6) start at a level the admin chooses for that upload.
 - **Session** — one class meeting/lecture, generated from a recurring schedule
@@ -41,7 +42,7 @@ CREATE TABLE batches (
 -- Class levels (static reference data, seeded once)
 CREATE TABLE class_levels (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE,     -- จูฬตรี, จูฬโท, ...
+    name VARCHAR(100) NOT NULL UNIQUE,     -- full title + short name: จูฬอาภิธรรมิกะตรี (จูฬตรี), ...
     sort_order INT NOT NULL UNIQUE         -- 1..9, defines promotion order
 );
 
@@ -693,3 +694,6 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
   check-ins and freezes its schedule (`migrations/2026-11-class-closed.sql`).
 - **Per-session attendance by ห้องเรียน (2026-11)** — reports gained a ห้องเรียน filter with an
   on-screen check-in matrix and a matching CSV, and clickable student names (Feature 3).
+- **Full level titles (2026-11)** — `class_levels.name` became the full title with the short name in
+  brackets (e.g. `มัชฌิมอาภิธรรมิกะตรี (มัชฌิมตรี)`), shown on every page and CSV. Data-only change,
+  keyed by `sort_order` (`migrations/2026-11-class-level-full-names.sql`).
