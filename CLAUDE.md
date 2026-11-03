@@ -106,6 +106,10 @@ up the intake poster (`assets/images/landingpage.jpg`, a `<dialog>`, flagged by
 - `attendance.php` — `getAttendanceSummary()`: builds the check-in grid and % complete. The denominator
   is sessions whose date is on/before the *most recent past session's date* (not a fixed "today" cutoff,
   and not counting future scheduled sessions) — this is a deliberate business rule, not a bug.
+  `addDisplayNumbers()` gives each session the number every UI shows (`display_number`): 1..n over
+  the class's non-cancelled sessions in `session_number` order, `null` for cancelled ones, so a
+  cancelled class leaves no gap (`checkin.php`, `admin/classes.php`, `admin/reports.php`). The stored
+  `session_number` is internal and never changes; un-cancelling a session renumbers the later ones.
 - `backup.php` — `runBackup()`: pure-PHP `SHOW CREATE TABLE` + row dump, gzip-compressed to a
   timestamped `.sql.gz` file under `config.local.php['backup']['directory']` (no dependency on the
   `mysqldump` binary; file chmod 0600, a new directory 0700), emailed as an attachment to each recipient, logged to `backup_runs`.

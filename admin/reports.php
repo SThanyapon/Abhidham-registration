@@ -259,7 +259,7 @@ if ($exportCsv) {
         fputcsv($out, ['ครั้งที่', 'วันที่เรียน', 'ลงชื่อเข้าเรียน']);
         foreach (($singleReport['sessions'] ?? []) as $session) {
             fputcsv($out, csvSafe([
-                $session['session_number'],
+                $session['display_number'],
                 $session['session_date'],
                 $session['checked_in'] ? 'ใช่' : 'ไม่ใช่',
             ]));
@@ -424,7 +424,7 @@ $exportHref = 'reports.php?export=csv&view=' . $view . '&sort=' . urlencode($sor
                     <?php foreach ($singleReport['sessions'] as $session): ?>
                         <div class="session-box <?= $session['checked_in'] ? 'checked' : 'missing' ?>"
                              title="<?= htmlspecialchars(formatDateBEShort($session['session_date'])) ?>">
-                            <?= $session['session_number'] ?>
+                            <?= $session['display_number'] ?>
                         </div>
                     <?php endforeach; ?>
                 </div>

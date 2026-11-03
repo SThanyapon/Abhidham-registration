@@ -4,6 +4,7 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/input.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/date_helpers.php';
+require_once __DIR__ . '/../includes/attendance.php';
 
 $adminId = requireAdminLogin();
 requireFeature($adminId, 1);
@@ -153,7 +154,7 @@ if ($selectedClassId > 0) {
     );
     $stmt->bind_param('i', $selectedClassId);
     $stmt->execute();
-    $sessions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $sessions = addDisplayNumbers($stmt->get_result()->fetch_all(MYSQLI_ASSOC));
     $stmt->close();
 }
 
@@ -300,7 +301,7 @@ $dayLabels = [
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="update_session">
                     <input type="hidden" name="session_id" value="<?= $session['id'] ?>">
-                    <span>#<?= $session['session_number'] ?></span>
+                    <span><?= $session['display_number'] === null ? '—' : '#' . $session['display_number'] ?></span>
                     <span><?= htmlspecialchars(dayOfWeekLabel($session['session_date'], $dayLabels)) ?></span>
                     <span><?= htmlspecialchars(formatDateBEShort($session['session_date'])) ?></span>
                     <label class="checkbox-label">

@@ -317,6 +317,9 @@ remains. Changing an existing admin's feature permissions isn't supported.
 - Generate a recurring schedule: given number of sessions, start date, and days-of-week
   (e.g. Tue+Thu), bulk-insert `sessions` rows numbered sequentially.
 - Cancel an individual session (toggle `is_cancelled`) without regenerating the whole series.
+  Cancelling leaves no gap in the numbering students and admins see: every page shows ครั้งที่
+  1..n over the non-cancelled sessions (`addDisplayNumbers()` in `includes/attendance.php`), while the
+  stored `session_number` stays unchanged.
   Rescheduling a single session's date is not supported from the UI — regenerate/adjust via
   the schedule generator instead. Each session is shown with a weekday label and its date in
   short Thai Buddhist Era format (e.g. `17 ก.ย. 69`, via the shared `formatDateBEShort()` in

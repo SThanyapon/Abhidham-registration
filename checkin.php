@@ -135,11 +135,16 @@ $sessionsByClass = [];
 foreach ($classes as $class) {
     $sessionStmt = $mysqli->prepare(
         'SELECT id, session_number, session_date FROM sessions
-         WHERE class_instance_id = ? AND is_cancelled = 0 AND session_date <= ? ORDER BY session_number'
+         WHERE class_instance_id = ? AND is_cancelled = 0 ORDER BY session_number'
     );
-    $sessionStmt->bind_param('is', $class['id'], $today);
+    $sessionStmt->bind_param('i', $class['id']);
     $sessionStmt->execute();
-    $sessions = $sessionStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    // Number over every active session, then drop future ones, so the numbers
+    // match admin/reports.php and admin/classes.php.
+    $sessions = array_values(array_filter(
+        addDisplayNumbers($sessionStmt->get_result()->fetch_all(MYSQLI_ASSOC)),
+        fn ($s) => $s['session_date'] <= $today
+    ));
     $sessionStmt->close();
 
     foreach ($sessions as &$session) {
@@ -225,7 +230,7 @@ foreach ($classes as $class) {
                 <?php foreach ($attendance['sessions'] as $session): ?>
                     <div class="session-box <?= $session['checked_in'] ? 'checked' : 'missing' ?>"
                          title="<?= htmlspecialchars(formatDateBEShort($session['session_date'])) ?>">
-                        <?= $session['session_number'] ?>
+                        <?= $session['display_number'] ?>
                     </div>
                 <?php endforeach; ?>
             </div>
@@ -247,7 +252,7 @@ foreach ($classes as $class) {
             sessions.forEach(function (session) {
                 const option = document.createElement('option');
                 option.value = session.id;
-                option.textContent = 'ครั้งที่ ' + session.session_number + ' (' + session.session_date_be + ')';
+                option.textContent = 'ครั้งที่ ' + session.display_number + ' (' + session.session_date_be + ')';
                 sessionSelect.appendChild(option);
             });
         }
