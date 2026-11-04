@@ -52,15 +52,19 @@ original requirements.
      student's current ชั้นเรียน; picking a class that isn't theirs is refused with no progress shown
    - `/lookup.php` — find a student ID (and current ระดับชั้น) by name; also tells
      pending/rejected applicants their registration status
+   - `/books.php` — "ยืนยันการรับหนังสือ" (menu shown on `/` only while a ห้องเรียน has it open on
+     `admin/classes.php`): student ID + name, then the registration address on the left and,
+     after "ยืนยันการรับหนังสือ", a shipping form on the right (recipient name, phone, address;
+     "ใช้ที่อยู่เดียวกับที่ลงทะเบียน" copies the registration address). Once per student per ห้องเรียน
    - `/admin/login.php` — admin backend (username/password, then an emailed OTP code). The
      dashboard shows, in two columns, only the features the admin has been granted:
 
      | # | Page | Feature |
      |---|------|---------|
      | 0 | `admin/admins.php` | Manage admins: create, reset password, enable/disable, delete |
-     | 1 | `admin/batches.php`, `admin/classes.php`, `admin/schedule.php` | Batches; class instances (open/close); session schedule per class |
+     | 1 | `admin/batches.php`, `admin/classes.php`, `admin/schedule.php` | Batches; class instances (open/close, open/close ยืนยันการรับหนังสือ); session schedule per class |
      | 2 | `admin/approvals.php` | Approve/reject registrations (assigns student IDs) |
-     | 3 | `admin/reports.php` | Attendance and rejected-applicant reports, filter by รุ่น/ระดับชั้น, per-session check-in matrix by ห้องเรียน, CSV export |
+     | 3 | `admin/reports.php` | Attendance and rejected-applicant reports, filter by รุ่น/ระดับชั้น, per-session check-in matrix by ห้องเรียน, book-confirmation counts and shipping list, CSV export |
      | 4 | `admin/promotions.php` | Promote students to the next level |
      | 6 | `admin/import_students.php` | Import already-approved students from CSV (their batches must exist) |
      | 7 | `admin/students.php` | Edit one student's details (by student ID + name) |
@@ -123,7 +127,7 @@ Substitute your own domain, paths and PHP version.
 
        location = / { }
        location ^~ /assets/ { try_files $uri =404; }
-       location ~ ^/(index|register|checkin|lookup)\.php$ { include snippets/abhidham-php.conf; }
+       location ~ ^/(index|register|checkin|lookup|books)\.php$ { include snippets/abhidham-php.conf; }
        location ~ ^/admin/[a-z_]+\.php$ { include snippets/abhidham-php.conf; }
        location / { return 404; }
    }
@@ -183,7 +187,7 @@ The app needs no code changes, only:
    The selector may offer nothing below 1024M for uploads and no `error_log` setting; errors then
    go to `error_log` files next to the failing script, which the `.htaccess` allowlist never serves.
 2. **Code**: `git clone` the repo (public, HTTPS) into the domain's `public_html`. The repo's
-   `.htaccess` is the nginx allowlist for Apache/LiteSpeed: only the four public pages,
+   `.htaccess` is the nginx allowlist for Apache/LiteSpeed: only the five public pages,
    `admin/*.php` and static files under `assets/` are served, everything else is 404, and HTTP
    redirects to HTTPS. It also sends the same four security headers as the nginx block and strips
    `X-Powered-By`.
@@ -306,7 +310,7 @@ plain `.sql`: `mysql <db name> < backups/<file>.sql`).
 
 ## Rate limiting
 
-`includes/rate_limit.php` throttles every public form (register, check-in, lookup) by client IP,
+`includes/rate_limit.php` throttles every public form (register, check-in, lookup, books: `book_confirm`) by client IP,
 using the thresholds in `config.local.php['rate_limit']`. Admin login and OTP verification are
 throttled more defensively, on independent buckets so neither a single source nor a distributed
 one can brute-force an account:

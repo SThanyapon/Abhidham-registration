@@ -107,13 +107,6 @@ function validateStudentFields(array $raw, bool $requireRegistrationExtras = fal
         'prefix_other' => cleanText((string) ($raw['prefix_other'] ?? '')),
         'full_name' => cleanText((string) ($raw['full_name'] ?? '')),
         'age' => trim((string) ($raw['age'] ?? '')),
-        'address' => cleanMultilineText((string) ($raw['address'] ?? '')),
-        'residence' => studentResidence($raw),
-        'country' => cleanText((string) ($raw['country'] ?? '')),
-        'province' => cleanText((string) ($raw['province'] ?? '')),
-        'district' => cleanText((string) ($raw['district'] ?? '')),
-        'sub_district' => cleanText((string) ($raw['sub_district'] ?? '')),
-        'postal_code' => cleanText((string) ($raw['postal_code'] ?? '')),
         'phone' => cleanText((string) ($raw['phone'] ?? '')),
         'line_name' => cleanText((string) ($raw['line_name'] ?? '')),
         'line_id' => cleanText((string) ($raw['line_id'] ?? '')),
@@ -166,15 +159,8 @@ function validateStudentFields(array $raw, bool $requireRegistrationExtras = fal
         }
     }
 
-    // In Thailand the country is fixed and the postcode is digits only; abroad everything is free
-    // text and there is no sub-district box.
-    $abroad = $clean['residence'] === RESIDENCE_ABROAD;
-    if ($abroad) {
-        $clean['sub_district'] = '';
-    } else {
-        $clean['country'] = COUNTRY_THAILAND;
-        $clean['postal_code'] = cleanCode($clean['postal_code']);
-    }
+    [$address, $addressMissing, $addressError] = validateAddressFields($raw, $requireRegistrationExtras);
+    $clean += $address;
 
     // Only a returning student has a previous ID (the form disables the box otherwise).
     if ($clean['student_type'] !== STUDENT_TYPE_RETURNING) {
@@ -193,24 +179,7 @@ function validateStudentFields(array $raw, bool $requireRegistrationExtras = fal
     if ($clean['age'] === '') {
         $missing[] = 'อายุ';
     }
-    if ($clean['address'] === '') {
-        $missing[] = 'ที่อยู่';
-    }
-    if ($requireRegistrationExtras && $abroad) {
-        if ($clean['district'] === '') {
-            $missing[] = 'เมือง';
-        }
-        if ($clean['country'] === '') {
-            $missing[] = 'ประเทศ';
-        }
-    } elseif ($requireRegistrationExtras) {
-        foreach (['postal_code' => 'รหัสไปรษณีย์', 'province' => 'จังหวัด', 'district' => 'อำเภอ/เขต',
-                  'sub_district' => 'ตำบล/แขวง'] as $field => $label) {
-            if ($clean[$field] === '') {
-                $missing[] = $label;
-            }
-        }
-    }
+    array_push($missing, ...$addressMissing);
     if ($clean['phone'] === '') {
         $missing[] = 'เบอร์มือถือ';
     }
@@ -243,27 +212,11 @@ function validateStudentFields(array $raw, bool $requireRegistrationExtras = fal
         return [$clean, 'กรุณากรอกอายุเป็นตัวเลข 1-120'];
     }
 
-    if ($abroad) {
-        if ($clean['postal_code'] !== '' && !preg_match('/^[A-Za-z0-9 \-]{1,20}$/', $clean['postal_code'])) {
-            return [$clean, 'รหัสไปรษณีย์ ใช้ได้เฉพาะตัวอักษรอังกฤษ ตัวเลข ขีด และช่องว่าง ไม่เกิน 20 ตัว'];
-        }
-    } elseif ($clean['postal_code'] !== '' && !preg_match('/^[0-9]{5}$/', $clean['postal_code'])) {
-        return [$clean, 'กรุณากรอกรหัสไปรษณีย์เป็นตัวเลข 5 หลัก'];
+    if ($addressError !== null) {
+        return [$clean, $addressError];
     }
 
-    // Public registration picks จังหวัด/อำเภอ/ตำบล from the postcode's lists, so the chain must
-    // exist. The CSV import and admin edit only format-check: older rows have no อำเภอ/ตำบล and
-    // may hold other spellings.
-    if ($requireRegistrationExtras && !$abroad) {
-        $subDistricts = thaiPostcodes()[$clean['postal_code']][$clean['province']][$clean['district']] ?? null;
-        if (!is_array($subDistricts) || !in_array($clean['sub_district'], $subDistricts, true)) {
-            return [$clean, 'ข้อมูล จังหวัด/อำเภอ/ตำบล ไม่ตรงกับรหัสไปรษณีย์ กรุณาเลือกจากรายการ'];
-        }
-    }
-
-    // Digits, spaces, '-' and '+' only, with 9-15 digits (Thai landline/mobile, or +66...).
-    $phoneDigits = preg_replace('/\D/', '', $clean['phone']);
-    if (!preg_match('/^\+?[0-9 \-]+$/', $clean['phone']) || strlen($phoneDigits) < 9 || strlen($phoneDigits) > 15) {
+    if (!isValidPhone($clean['phone'])) {
         return [$clean, 'กรุณากรอกเบอร์มือถือให้ถูกต้อง'];
     }
 
@@ -281,6 +234,128 @@ function validateStudentFields(array $raw, bool $requireRegistrationExtras = fal
         }
     }
     foreach (STUDENT_NULLABLE_FIELDS as $field) {
+        if ($clean[$field] === '') {
+            $clean[$field] = null;
+        }
+    }
+
+    return [$clean, null];
+}
+
+/**
+ * Cleans and checks the address block of addressFields() (address, residence, country, province,
+ * district, sub_district, postal_code). Shared by validateStudentFields() and validateBookShipping().
+ *
+ * Follows studentResidence(): in Thailand country becomes COUNTRY_THAILAND and the postcode must be
+ * 5 digits; abroad all parts are free text and sub_district is dropped. The street address is always
+ * required. $strict makes the other parts mandatory too and checks a Thai postcode -> province ->
+ * district -> sub-district chain against thaiPostcodes().
+ *
+ * Returns [$clean, $missing, $error]: the cleaned values (empty parts stay ''), the Thai captions of
+ * missing required parts, and the first format/chain error (null when none; only meaningful when
+ * nothing is missing).
+ */
+function validateAddressFields(array $raw, bool $strict): array
+{
+    $clean = [
+        'address' => cleanMultilineText((string) ($raw['address'] ?? '')),
+        'residence' => studentResidence($raw),
+        'country' => cleanText((string) ($raw['country'] ?? '')),
+        'province' => cleanText((string) ($raw['province'] ?? '')),
+        'district' => cleanText((string) ($raw['district'] ?? '')),
+        'sub_district' => cleanText((string) ($raw['sub_district'] ?? '')),
+        'postal_code' => cleanText((string) ($raw['postal_code'] ?? '')),
+    ];
+
+    // In Thailand the country is fixed and the postcode is digits only; abroad everything is free
+    // text and there is no sub-district box.
+    $abroad = $clean['residence'] === RESIDENCE_ABROAD;
+    if ($abroad) {
+        $clean['sub_district'] = '';
+    } else {
+        $clean['country'] = COUNTRY_THAILAND;
+        $clean['postal_code'] = cleanCode($clean['postal_code']);
+    }
+
+    $missing = [];
+    if ($clean['address'] === '') {
+        $missing[] = 'ที่อยู่';
+    }
+    if ($strict && $abroad) {
+        if ($clean['district'] === '') {
+            $missing[] = 'เมือง';
+        }
+        if ($clean['country'] === '') {
+            $missing[] = 'ประเทศ';
+        }
+    } elseif ($strict) {
+        foreach (['postal_code' => 'รหัสไปรษณีย์', 'province' => 'จังหวัด', 'district' => 'อำเภอ/เขต',
+                  'sub_district' => 'ตำบล/แขวง'] as $field => $label) {
+            if ($clean[$field] === '') {
+                $missing[] = $label;
+            }
+        }
+    }
+
+    $error = null;
+    if ($abroad) {
+        if ($clean['postal_code'] !== '' && !preg_match('/^[A-Za-z0-9 \-]{1,20}$/', $clean['postal_code'])) {
+            $error = 'รหัสไปรษณีย์ ใช้ได้เฉพาะตัวอักษรอังกฤษ ตัวเลข ขีด และช่องว่าง ไม่เกิน 20 ตัว';
+        }
+    } elseif ($clean['postal_code'] !== '' && !preg_match('/^[0-9]{5}$/', $clean['postal_code'])) {
+        $error = 'กรุณากรอกรหัสไปรษณีย์เป็นตัวเลข 5 หลัก';
+    } elseif ($strict) {
+        // Public forms pick จังหวัด/อำเภอ/ตำบล from the postcode's lists, so the chain must exist. The
+        // CSV import and admin edit only format-check: older rows have no อำเภอ/ตำบล and may hold
+        // other spellings.
+        $subDistricts = thaiPostcodes()[$clean['postal_code']][$clean['province']][$clean['district']] ?? null;
+        if (!is_array($subDistricts) || !in_array($clean['sub_district'], $subDistricts, true)) {
+            $error = 'ข้อมูล จังหวัด/อำเภอ/ตำบล ไม่ตรงกับรหัสไปรษณีย์ กรุณาเลือกจากรายการ';
+        }
+    }
+
+    return [$clean, $missing, $error];
+}
+
+// Digits, spaces, '-' and '+' only, with 9-15 digits (Thai landline/mobile, or +66...).
+function isValidPhone(string $phone): bool
+{
+    $digits = preg_replace('/\D/', '', $phone);
+
+    return preg_match('/^\+?[0-9 \-]+$/', $phone) === 1 && strlen($digits) >= 9 && strlen($digits) <= 15;
+}
+
+/**
+ * Cleans and validates the books.php shipping form: recipient_name, phone and the address block
+ * (strict, like registration, so shipping staff get a checked postcode chain). Returns [$clean,
+ * $error] like validateStudentFields(); empty optional address parts become null when valid.
+ */
+function validateBookShipping(array $raw): array
+{
+    [$clean, $missing, $error] = validateAddressFields($raw, true);
+    $clean['recipient_name'] = cleanText((string) ($raw['recipient_name'] ?? ''));
+    $clean['phone'] = cleanText((string) ($raw['phone'] ?? ''));
+
+    if ($clean['recipient_name'] === '') {
+        array_unshift($missing, 'ชื่อ-นามสกุลผู้รับ');
+    }
+    if ($clean['phone'] === '') {
+        $missing[] = 'เบอร์มือถือ';
+    }
+    if ($missing !== []) {
+        return [$clean, 'กรุณากรอกข้อมูลให้ครบถ้วน: ' . implode(', ', $missing)];
+    }
+    if (!isValidPersonName($clean['recipient_name'])) {
+        return [$clean, 'ชื่อ-นามสกุลผู้รับ ใช้ได้เฉพาะอักษรไทย อักษรอังกฤษ ตัวเลข ขีด (-) และช่องว่างเท่านั้น'];
+    }
+    if ($error !== null) {
+        return [$clean, $error];
+    }
+    if (!isValidPhone($clean['phone'])) {
+        return [$clean, 'กรุณากรอกเบอร์มือถือให้ถูกต้อง'];
+    }
+
+    foreach (['country', 'province', 'district', 'sub_district', 'postal_code'] as $field) {
         if ($clean[$field] === '') {
             $clean[$field] = null;
         }

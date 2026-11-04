@@ -350,6 +350,36 @@ dialog.landing-dialog .action-row {
     display: none;
 }
 
+/* books.php: registration address (left) beside the shipping form (right); one column on phones */
+.book-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+}
+
+.book-columns > * {
+    min-width: 0;
+}
+
+.book-columns form {
+    margin-bottom: 0;
+}
+
+.book-columns [hidden] {
+    display: none;
+}
+
+.book-columns h2 {
+    margin-top: 0;
+}
+
+@media (max-width: 600px) {
+    .book-columns {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Multi-select list (ทราบข่าวจากช่องทางใด): the browser's own <select multiple>, all options visible */
 select[multiple] {
     padding: 6px;

@@ -22,6 +22,7 @@ CREATE TABLE class_instances (
     class_level_id INT NOT NULL,
     start_date DATE NULL, -- legacy, no longer written: the start date is the first non-cancelled session
     is_closed BOOLEAN NOT NULL DEFAULT FALSE, -- closed ห้องเรียน: no check-ins, schedule read-only
+    book_confirmation_open BOOLEAN NOT NULL DEFAULT FALSE, -- students of this class may confirm book shipping (books.php)
     UNIQUE (batch_id, class_level_id),
     FOREIGN KEY (batch_id) REFERENCES batches(id),
     FOREIGN KEY (class_level_id) REFERENCES class_levels(id)
@@ -80,6 +81,26 @@ CREATE TABLE checkins (
     UNIQUE (student_id, session_id),
     FOREIGN KEY (student_id) REFERENCES students(id),
     FOREIGN KEY (session_id) REFERENCES sessions(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ยืนยันการรับหนังสือ: one shipping address per student and ห้องเรียน (books.php)
+CREATE TABLE book_confirmations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    class_instance_id INT NOT NULL,
+    recipient_name VARCHAR(255) NOT NULL,
+    phone VARCHAR(50) NOT NULL,
+    address TEXT NOT NULL,
+    country VARCHAR(100),
+    province VARCHAR(100),
+    district VARCHAR(100),
+    sub_district VARCHAR(100),
+    postal_code VARCHAR(20),
+    same_as_registration BOOLEAN NOT NULL DEFAULT FALSE,
+    confirmed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (student_id, class_instance_id),
+    FOREIGN KEY (student_id) REFERENCES students(id),
+    FOREIGN KEY (class_instance_id) REFERENCES class_instances(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE admin_users (

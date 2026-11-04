@@ -12,16 +12,17 @@ requireFeature($adminId, 3);
 
 $mysqli = getDbConnection();
 
-// Two views: approved students with attendance (default), or applicants whose registration was
-// rejected. Rejected rows have no student_no/level/attendance, so they get their own columns.
-$view = ($_GET['view'] ?? '') === 'rejected' ? 'rejected' : 'approved';
+// Three views: approved students with attendance (default), applicants whose registration was
+// rejected (no student_no/level/attendance, so they get their own columns), or ยืนยันการรับหนังสือ
+// (book_confirmations per ห้องเรียน; shares the approved view's filters and student dropdown).
+$view = in_array($_GET['view'] ?? '', ['rejected', 'books'], true) ? $_GET['view'] : 'approved';
 
-// Optional filters (0 = all): รุ่น for both views, ระดับชั้น (current level) for approved only.
+// Optional filters (0 = all): รุ่น for every view, ระดับชั้น (current level) for approved and books.
 $batchOptions = $mysqli->query('SELECT id, batch_no, name AS batch_name FROM batches ORDER BY batch_no DESC')
     ->fetch_all(MYSQLI_ASSOC);
 $levelOptions = $mysqli->query('SELECT id, name FROM class_levels ORDER BY sort_order')->fetch_all(MYSQLI_ASSOC);
 $filterBatchId = (int) ($_GET['batch_id'] ?? 0);
-$filterLevelId = $view === 'approved' ? (int) ($_GET['level_id'] ?? 0) : 0;
+$filterLevelId = $view !== 'rejected' ? (int) ($_GET['level_id'] ?? 0) : 0;
 if (!in_array($filterBatchId, array_map('intval', array_column($batchOptions, 'id')), true)) {
     $filterBatchId = 0;
 }
@@ -29,11 +30,11 @@ if (!in_array($filterLevelId, array_map('intval', array_column($levelOptions, 'i
     $filterLevelId = 0;
 }
 
-// Optional ห้องเรียน filter (approved view): one class instance, any class incl. finished/closed ones,
+// Optional ห้องเรียน filter (approved and books views): one class instance, any class incl. finished/closed ones,
 // listed only for the chosen รุ่น when that filter is set.
 $classOptions = [];
 $filterClass = null;
-if ($view === 'approved') {
+if ($view !== 'rejected') {
     $stmt = $mysqli->prepare(
         'SELECT ci.id, ci.batch_id, ci.is_closed, cl.name AS level_name, cl.sort_order, b.batch_no, b.name AS batch_name
          FROM class_instances ci
@@ -73,7 +74,7 @@ function filterQuery(int $batchId, int $levelId, int $classInstanceId = 0): stri
         . ($classInstanceId > 0 ? '&class_instance_id=' . $classInstanceId : '');
 }
 
-if ($view === 'approved') {
+if ($view !== 'rejected') {
     // Sortable columns for the all-students table: key => header label. Default: student ID ascending.
     $sortColumns = [
         'student_no' => 'รหัสนักศึกษา',
@@ -115,7 +116,7 @@ if ($view === 'approved') {
     $defaultDir = 'desc';
 }
 
-$sortable = $view === 'approved' ? array_keys($sortColumns) : $rejectedSortable;
+$sortable = $view !== 'rejected' ? array_keys($sortColumns) : $rejectedSortable;
 $sort = in_array($_GET['sort'] ?? '', $sortable, true) ? $_GET['sort'] : $defaultSort;
 $dir = ($_GET['dir'] ?? $defaultDir) === 'desc' ? 'desc' : 'asc';
 
@@ -125,7 +126,7 @@ $prefixOrder = "CASE WHEN s.prefix = 'อื่นๆ' THEN s.prefix_other ELSE 
 $students = [];
 $rejected = [];
 
-if ($view === 'approved') {
+if ($view !== 'rejected') {
     // Student IDs are numeric strings of varying length, so order by length first (7201 < 10101).
     $studentNoOrder = "s.student_no IS NULL, LENGTH(s.student_no) $dir, s.student_no $dir";
     // Stored columns sort in SQL (MySQL collation handles Thai names); computed attendance columns are
@@ -140,7 +141,8 @@ if ($view === 'approved') {
     };
 
     $stmt = $mysqli->prepare(
-        "SELECT s.id, s.student_no, s.prefix, s.prefix_other, s.full_name, cl.name AS level_name, b.batch_no, b.name AS batch_name
+        "SELECT s.id, s.student_no, s.prefix, s.prefix_other, s.full_name, s.batch_id, cl.name AS level_name,
+                cl.sort_order AS level_sort, b.batch_no, b.name AS batch_name
          FROM students s
          JOIN class_levels cl ON cl.id = s.current_class_level_id
          JOIN batches b ON b.id = s.batch_id
@@ -180,7 +182,7 @@ if ($view === 'approved') {
     $stmt->close();
 }
 
-$selectedStudentId = $view === 'approved' ? (int) ($_GET['student_id'] ?? 0) : 0;
+$selectedStudentId = $view !== 'rejected' ? (int) ($_GET['student_id'] ?? 0) : 0;
 $exportCsv = ($_GET['export'] ?? '') === 'csv';
 
 $selectedStudent = null;
@@ -194,7 +196,7 @@ if ($selectedStudentId > 0) {
         }
     }
 
-    if ($selectedStudent) {
+    if ($selectedStudent && $view === 'approved') {
         $classInstanceId = studentClassInstanceId($mysqli, $selectedStudentId);
         if ($classInstanceId !== null) {
             $singleReport = getAttendanceSummary($mysqli, $classInstanceId, $selectedStudentId);
@@ -206,7 +208,7 @@ if ($selectedStudentId > 0) {
 // columns. A session counts as conducted once its date has passed, matching getAttendanceSummary().
 $matrixSessions = [];
 $today = date('Y-m-d');
-if ($filterClass && $selectedStudentId === 0) {
+if ($view === 'approved' && $filterClass && $selectedStudentId === 0) {
     $stmt = $mysqli->prepare(
         'SELECT id, session_number, session_date FROM sessions
          WHERE class_instance_id = ? AND is_cancelled = 0 ORDER BY session_number'
@@ -245,6 +247,107 @@ if ($view === 'approved' && $selectedStudentId === 0) {
     }
 }
 
+// ยืนยันการรับหนังสือ view. $bookSummary: one row per ห้องเรียน that is open for confirmation or has
+// any confirmation, narrowed by รุ่น / ระดับชั้น (the class's level). Its student count is the class's
+// current students plus anyone who confirmed there and has been promoted since.
+// $bookRows: the confirmations themselves (for a chosen ห้องเรียน, or every listed one), also the CSV.
+// $studentBookRows: a chosen student's classes in that set, confirmed or not.
+$bookSummary = [];
+$bookRows = [];
+$studentBookRows = [];
+if ($view === 'books') {
+    $stmt = $mysqli->prepare(
+        "SELECT ci.id, ci.batch_id, ci.book_confirmation_open, cl.name AS level_name, b.batch_no, b.name AS batch_name,
+                (SELECT COUNT(*) FROM book_confirmations bc WHERE bc.class_instance_id = ci.id) AS confirmed_count,
+                (SELECT COUNT(*) FROM students s
+                  WHERE s.status = 'approved' AND s.batch_id = ci.batch_id
+                    AND (s.current_class_level_id = ci.class_level_id
+                         OR EXISTS (SELECT 1 FROM book_confirmations bc
+                                    WHERE bc.class_instance_id = ci.id AND bc.student_id = s.id))) AS student_count
+         FROM class_instances ci
+         JOIN class_levels cl ON cl.id = ci.class_level_id
+         JOIN batches b ON b.id = ci.batch_id
+         WHERE (ci.book_confirmation_open = 1
+                OR EXISTS (SELECT 1 FROM book_confirmations bc WHERE bc.class_instance_id = ci.id))
+           AND (? = 0 OR ci.id = ?)
+           AND (? = 0 OR ci.batch_id = ?)
+           AND (? = 0 OR ci.class_level_id = ?)
+         ORDER BY b.batch_no DESC, cl.sort_order"
+    );
+    $stmt->bind_param('iiiiii', $filterClassId, $filterClassId, $filterBatchId, $filterBatchId, $filterLevelId, $filterLevelId);
+    $stmt->execute();
+    $bookSummary = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    if ($selectedStudent) {
+        $stmt = $mysqli->prepare(
+            "SELECT ci.id AS class_instance_id, ci.book_confirmation_open, cl.name AS class_level_name,
+                    b.batch_no, b.name AS batch_name, bc.id AS confirmation_id, bc.recipient_name, bc.phone,
+                    bc.address, bc.country, bc.province, bc.district, bc.sub_district, bc.postal_code,
+                    bc.same_as_registration, bc.confirmed_at
+             FROM class_instances ci
+             JOIN class_levels cl ON cl.id = ci.class_level_id
+             JOIN batches b ON b.id = ci.batch_id
+             LEFT JOIN book_confirmations bc ON bc.class_instance_id = ci.id AND bc.student_id = ?
+             WHERE ci.batch_id = ? AND cl.sort_order <= ?
+               AND (ci.book_confirmation_open = 1 OR bc.id IS NOT NULL)
+             ORDER BY cl.sort_order"
+        );
+        $levelSort = (int) $selectedStudent['level_sort'];
+        $studentBatchId = (int) $selectedStudent['batch_id'];
+        $stmt->bind_param('iii', $selectedStudentId, $studentBatchId, $levelSort);
+        $stmt->execute();
+        $studentBookRows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+    } elseif ($selectedStudentId === 0) {
+        $stmt = $mysqli->prepare(
+            "SELECT bc.*, s.student_no, s.prefix, s.prefix_other, s.full_name, cl.name AS class_level_name,
+                    b.batch_no, b.name AS batch_name
+             FROM book_confirmations bc
+             JOIN students s ON s.id = bc.student_id
+             JOIN class_instances ci ON ci.id = bc.class_instance_id
+             JOIN class_levels cl ON cl.id = ci.class_level_id
+             JOIN batches b ON b.id = ci.batch_id
+             WHERE (? = 0 OR ci.id = ?)
+               AND (? = 0 OR ci.batch_id = ?)
+               AND (? = 0 OR ci.class_level_id = ?)
+             ORDER BY b.batch_no DESC, cl.sort_order, LENGTH(s.student_no), s.student_no"
+        );
+        $stmt->bind_param('iiiiii', $filterClassId, $filterClassId, $filterBatchId, $filterBatchId, $filterLevelId, $filterLevelId);
+        $stmt->execute();
+        $bookRows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+    }
+}
+
+// Shipping CSV / detail-table columns for a confirmation row (blank parts shown as '-').
+const BOOK_COLUMNS = [
+    'รุ่น', 'ห้องเรียน', 'รหัสนักศึกษา', 'คำนำหน้า', 'ชื่อ-นามสกุล (ที่ลงทะเบียน)', 'ชื่อ-นามสกุลผู้รับ',
+    'เบอร์มือถือผู้รับ', 'ที่อยู่', 'ตำบล/แขวง', 'อำเภอ/เขต', 'จังหวัด', 'รหัสไปรษณีย์', 'ประเทศ',
+    'ใช้ที่อยู่ที่ลงทะเบียน', 'วันที่ยืนยัน',
+];
+
+function bookRowValues(array $row, array $student): array
+{
+    return [
+        batchLabel($row),
+        $row['class_level_name'],
+        $student['student_no'] ?? '-',
+        studentPrefix($student),
+        $student['full_name'],
+        $row['recipient_name'],
+        $row['phone'],
+        $row['address'],
+        $row['sub_district'] ?: '-',
+        $row['district'] ?: '-',
+        $row['province'] ?: '-',
+        $row['postal_code'] ?: '-',
+        $row['country'] ?: '-',
+        $row['same_as_registration'] ? 'ใช่' : 'ไม่ใช่',
+        substr((string) $row['confirmed_at'], 0, 10),
+    ];
+}
+
 function sortHeader(string $key, string $label, string $sort, string $dir, string $view, string $filters): string
 {
     $isActive = $key === $sort;
@@ -281,6 +384,10 @@ function matrixCell(array $summary, array $session, string $today, string $check
 if ($exportCsv) {
     if ($view === 'rejected') {
         $filename = 'rejected_applicants.csv';
+    } elseif ($view === 'books') {
+        $filename = $selectedStudent
+            ? 'book_shipping_' . preg_replace('/[^A-Za-z0-9]+/', '_', $selectedStudent['student_no'] ?? (string) $selectedStudentId) . '.csv'
+            : ($filterClass ? 'book_shipping_class_' . $filterClassId . '.csv' : 'book_shipping.csv');
     } else {
         $filename = $selectedStudent
             ? 'attendance_' . preg_replace('/[^A-Za-z0-9]+/', '_', $selectedStudent['student_no'] ?? (string) $selectedStudentId) . '.csv'
@@ -293,7 +400,21 @@ if ($exportCsv) {
     $out = fopen('php://output', 'w');
     fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel renders Thai text correctly
 
-    if ($view === 'rejected') {
+    if ($view === 'books') {
+        // Shipping list for the shipping staff: confirmed rows only.
+        fputcsv($out, BOOK_COLUMNS);
+        if ($selectedStudent) {
+            foreach ($studentBookRows as $row) {
+                if ($row['confirmation_id'] !== null) {
+                    fputcsv($out, csvSafe(bookRowValues($row, $selectedStudent)));
+                }
+            }
+        } else {
+            foreach ($bookRows as $row) {
+                fputcsv($out, csvSafe(bookRowValues($row, $row)));
+            }
+        }
+    } elseif ($view === 'rejected') {
         fputcsv($out, array_values($sortColumns));
         foreach ($rejected as $r) {
             fputcsv($out, csvSafe([
@@ -383,7 +504,7 @@ if ($exportCsv) {
 
 $filters = filterQuery($filterBatchId, $filterLevelId, $filterClassId);
 // The student list with the current filters and sort, without a selected student.
-$listHref = 'reports.php?view=approved&sort=' . urlencode($sort) . '&dir=' . $dir . $filters;
+$listHref = 'reports.php?view=' . $view . '&sort=' . urlencode($sort) . '&dir=' . $dir . $filters;
 $exportHref = 'reports.php?export=csv&view=' . $view . '&sort=' . urlencode($sort) . '&dir=' . $dir
     . ($selectedStudentId > 0 ? '&student_id=' . $selectedStudentId : '') . $filters;
 ?>
@@ -408,6 +529,7 @@ $exportHref = 'reports.php?export=csv&view=' . $view . '&sort=' . urlencode($sor
     <div class="view-toggle">
         <a href="reports.php?view=approved<?= filterQuery($filterBatchId, 0) ?>" class="<?= $view === 'approved' ? 'active' : '' ?>">นักศึกษาที่อนุมัติแล้ว</a>
         <a href="reports.php?view=rejected<?= filterQuery($filterBatchId, 0) ?>" class="<?= $view === 'rejected' ? 'active' : '' ?>">ผู้สมัครที่ไม่ได้รับการอนุมัติ</a>
+        <a href="reports.php?view=books<?= filterQuery($filterBatchId, 0) ?>" class="<?= $view === 'books' ? 'active' : '' ?>">ยืนยันการรับหนังสือ</a>
     </div>
 
     <form action="reports.php" method="get">
@@ -425,7 +547,7 @@ $exportHref = 'reports.php?export=csv&view=' . $view . '&sort=' . urlencode($sor
             <?php endforeach; ?>
         </select>
 
-        <?php if ($view === 'approved'): ?>
+        <?php if ($view !== 'rejected'): ?>
             <label for="level_id">ระดับชั้น</label>
             <select id="level_id" name="level_id" onchange="resetStudentAndSubmit(this.form)">
                 <option value="0">-- ทุกระดับชั้น --</option>
@@ -436,9 +558,9 @@ $exportHref = 'reports.php?export=csv&view=' . $view . '&sort=' . urlencode($sor
                 <?php endforeach; ?>
             </select>
 
-            <label for="class_instance_id">ห้องเรียน (รายละเอียดการเข้าเรียนรายครั้ง)</label>
+            <label for="class_instance_id"><?= $view === 'books' ? 'ห้องเรียน (รายชื่อผู้ยืนยันการรับหนังสือ)' : 'ห้องเรียน (รายละเอียดการเข้าเรียนรายครั้ง)' ?></label>
             <select id="class_instance_id" name="class_instance_id" onchange="resetStudentAndSubmit(this.form, false)">
-                <option value="0">-- ไม่เลือก (ดูสรุปตามชั้นเรียนปัจจุบัน) --</option>
+                <option value="0">-- ไม่เลือก (<?= $view === 'books' ? 'ดูสรุปทุกห้องเรียน' : 'ดูสรุปตามชั้นเรียนปัจจุบัน' ?>) --</option>
                 <?php foreach ($classOptions as $option): ?>
                     <option value="<?= (int) $option['id'] ?>" <?= $filterClassId === (int) $option['id'] ? 'selected' : '' ?>>
                         <?= htmlspecialchars(batchLabel($option) . ' - ' . $option['level_name'] . ($option['is_closed'] ? ' (ปิดแล้ว)' : '')) ?>
@@ -475,7 +597,98 @@ $exportHref = 'reports.php?export=csv&view=' . $view . '&sort=' . urlencode($sor
 
     <p><a href="<?= htmlspecialchars($exportHref) ?>">ส่งออกรายงานนี้เป็นไฟล์ CSV</a></p>
 
-    <?php if ($view === 'rejected'): ?>
+    <?php if ($view === 'books'): ?>
+        <?php if ($selectedStudentId > 0): ?>
+            <p><a href="<?= htmlspecialchars($listHref) ?>">กลับไปสรุปการยืนยันการรับหนังสือ</a></p>
+            <?php if (!$selectedStudent): ?>
+                <p class="error">ไม่พบนักศึกษา</p>
+            <?php else: ?>
+                <h2><?= htmlspecialchars(($selectedStudent['student_no'] ?? '-') . ' ' . studentPrefix($selectedStudent) . ' ' . $selectedStudent['full_name']) ?></h2>
+                <?php if ($studentBookRows === []): ?>
+                    <p>ไม่มีห้องเรียนที่เปิดหรือเคยเปิดให้ยืนยันการรับหนังสือสำหรับนักศึกษาคนนี้</p>
+                <?php else: ?>
+                    <div class="table-wrap"><table>
+                        <thead>
+                            <tr><th>ห้องเรียน</th><th>สถานะ</th><th>ชื่อ-นามสกุลผู้รับ</th><th>เบอร์มือถือผู้รับ</th><th>ที่อยู่จัดส่ง</th><th>วันที่ยืนยัน</th></tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($studentBookRows as $row): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars(batchLabel($row) . ' - ' . $row['class_level_name']) ?></td>
+                                    <td><?= $row['book_confirmation_open'] ? 'เปิด' : 'ปิด' ?></td>
+                                    <?php if ($row['confirmation_id'] === null): ?>
+                                        <td colspan="4">ยังไม่ยืนยัน</td>
+                                    <?php else: ?>
+                                        <td><?= htmlspecialchars($row['recipient_name']) ?></td>
+                                        <td><?= htmlspecialchars($row['phone']) ?></td>
+                                        <td><?= implode('<br>', array_map('htmlspecialchars', formatAddressLines($row))) ?></td>
+                                        <td><?= htmlspecialchars(formatDateBEShort(substr((string) $row['confirmed_at'], 0, 10))) ?></td>
+                                    <?php endif; ?>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table></div>
+                <?php endif; ?>
+            <?php endif; ?>
+        <?php else: ?>
+            <?php if ($bookSummary === []): ?>
+                <p>ยังไม่มีห้องเรียนที่เปิดให้ยืนยันการรับหนังสือ (เปิดได้ที่หน้าจัดการห้องเรียน)</p>
+            <?php else: ?>
+                <div class="table-wrap"><table>
+                    <thead>
+                        <tr><th>รุ่น</th><th>ห้องเรียน</th><th>สถานะ</th><th>ยืนยันแล้ว</th><th>ยังไม่ยืนยัน</th><th>นักศึกษาในห้อง</th><th>%</th></tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($bookSummary as $row):
+                            $confirmed = (int) $row['confirmed_count'];
+                            $total = (int) $row['student_count']; ?>
+                            <tr>
+                                <td><?= htmlspecialchars(batchLabel($row)) ?></td>
+                                <td><a href="<?= htmlspecialchars('reports.php?view=books' . filterQuery((int) $row['batch_id'], 0, (int) $row['id'])) ?>"><?= htmlspecialchars($row['level_name']) ?></a></td>
+                                <td><?= $row['book_confirmation_open'] ? 'เปิด' : 'ปิด' ?></td>
+                                <td><?= $confirmed ?></td>
+                                <td><?= max(0, $total - $confirmed) ?></td>
+                                <td><?= $total ?></td>
+                                <td><?= $total > 0 ? round($confirmed * 100 / $total) : 0 ?>%</td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table></div>
+            <?php endif; ?>
+
+            <?php if ($filterClass): ?>
+                <h2>ผู้ยืนยันการรับหนังสือ: <?= htmlspecialchars(batchLabel($filterClass) . ' - ' . $filterClass['level_name']) ?></h2>
+                <?php if ($bookRows === []): ?>
+                    <p>ยังไม่มีผู้ยืนยันการรับหนังสือในห้องเรียนนี้</p>
+                <?php else: ?>
+                    <div class="table-wrap"><table>
+                        <thead>
+                            <tr>
+                                <?php foreach (array_slice(BOOK_COLUMNS, 2) as $label): ?>
+                                    <th><?= htmlspecialchars($label) ?></th>
+                                <?php endforeach; ?>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($bookRows as $row): $values = bookRowValues($row, $row); ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($values[2]) ?></td>
+                                    <td><?= htmlspecialchars($values[3]) ?></td>
+                                    <td><a href="<?= htmlspecialchars($listHref . '&student_id=' . (int) $row['student_id']) ?>"><?= htmlspecialchars($values[4]) ?></a></td>
+                                    <?php foreach (array_slice($values, 5, 9) as $value): ?>
+                                        <td><?= nl2br(htmlspecialchars((string) $value)) ?></td>
+                                    <?php endforeach; ?>
+                                    <td><?= htmlspecialchars(formatDateBEShort($values[14])) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table></div>
+                <?php endif; ?>
+            <?php else: ?>
+                <p class="form-note">คลิกชื่อห้องเรียนเพื่อดูรายชื่อผู้ยืนยัน · ไฟล์ CSV มีที่อยู่จัดส่งของทุกห้องเรียนในตารางนี้</p>
+            <?php endif; ?>
+        <?php endif; ?>
+    <?php elseif ($view === 'rejected'): ?>
         <?php if ($rejected === []): ?>
             <p>ไม่มีผู้สมัครที่ไม่ได้รับการอนุมัติ</p>
         <?php else: ?>

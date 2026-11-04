@@ -31,6 +31,28 @@ function studentChoice(array $student, string $field): string
 }
 
 /**
+ * An address (a students or book_confirmations row: address, sub_district, district, province,
+ * postal_code, country) as display lines: the street address lines, then ตำบล อำเภอ จังหวัด
+ * รหัสไปรษณีย์ on one line, then the country when abroad. Empty parts are skipped.
+ */
+function formatAddressLines(array $row): array
+{
+    $lines = preg_split('/\R/', trim((string) ($row['address'] ?? '')), -1, PREG_SPLIT_NO_EMPTY);
+    $area = implode(' ', array_filter(
+        [$row['sub_district'] ?? '', $row['district'] ?? '', $row['province'] ?? '', $row['postal_code'] ?? ''],
+        fn ($part): bool => (string) $part !== ''
+    ));
+    if ($area !== '') {
+        $lines[] = $area;
+    }
+    if (studentResidence($row) === RESIDENCE_ABROAD) {
+        $lines[] = (string) $row['country'];
+    }
+
+    return $lines;
+}
+
+/**
  * The class instance for the student's batch + current level, or null if that class hasn't been
  * created yet.
  */

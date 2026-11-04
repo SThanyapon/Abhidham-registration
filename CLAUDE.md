@@ -32,6 +32,7 @@ mysql -u root -p abhidham_registration < migrations/2026-10-address-country.sql
 mysql -u root -p abhidham_registration < migrations/2026-11-class-start-date-optional.sql
 mysql -u root -p abhidham_registration < migrations/2026-11-class-closed.sql
 mysql -u root -p abhidham_registration < migrations/2026-11-class-level-full-names.sql
+mysql -u root -p abhidham_registration < migrations/2026-11-book-confirmations.sql
 
 # Create an admin user (feature numbers: 0=manage admins, 1=batches/classes/schedule, 2=approvals, 3=reports,
 # 4=promotions, 6=CSV import, 7=edit student, 9=backup; 5 is unused; defaults to all 8)
@@ -59,11 +60,11 @@ and the deploy procedure (`git pull --ff-only` on the server).
 ## Architecture
 
 **Request model:** each top-level `.php` file is both the route and the handler — no router, no MVC
-layer. Public pages (`index.php`, `register.php`, `checkin.php`, `lookup.php`) render forms with inline
+layer. Public pages (`index.php`, `register.php`, `checkin.php`, `lookup.php`, `books.php`) render forms with inline
 HTML/PHP and POST to sibling scripts. Admin pages under `admin/` follow the same pattern but require
 login. There is no templating engine; HTML is written directly in the `.php` files after the PHP logic
 block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output. The web server is an
-allowlist (`/`, the four public `.php` files, `/admin/*.php`, static `/assets/`; everything else 404):
+allowlist (`/`, the five public `.php` files, `/admin/*.php`, static `/assets/`; everything else 404):
 nginx config on a Linux server, the repo's `.htaccess` on Apache/LiteSpeed shared hosting. A new
 top-level page needs both updated (see README "Deploying"). Both also send the same security headers
 (X-Frame-Options, nosniff, Referrer-Policy, HSTS), so a header change goes in both places.
@@ -90,7 +91,8 @@ Both "ลงทะเบียนเลย" (the welcome screen's link and the p
   the session cookie to HttpOnly + SameSite=Lax (+ Secure over HTTPS) with strict mode.
 - `rate_limit.php` — sliding-window limiter (`checkRateLimit($formKey, $identifier)` +
   `recordRateLimitHit`) backed by the `rate_limit_hits` table, thresholds read from
-  `config.local.php['rate_limit']`. Applied to register, check-in, and lookup by `form_key`, keyed by
+  `config.local.php['rate_limit']` (a missing key means no limit). Applied to register, check-in, lookup and
+  books (`book_confirm`) by `form_key`, keyed by
   client IP. Admin login (`admin/login.php`) enforces two independent buckets — `admin_login` keyed by
   IP and `admin_login_account` keyed by username — so a distributed attack spread across many IPs is
   still capped per targeted account, not just per source. OTP verification (`admin/verify_otp.php`) adds
@@ -123,7 +125,7 @@ Both "ลงทะเบียนเลย" (the welcome screen's link and the p
   the `app_settings` key/value table (edited in `admin/backup.php` via `saveBackupRecipients()`),
   falling back to `config.local.php['backup']['recipient_email']` until one is saved.
 - `student_helpers.php` — `studentPrefix()` (display prefix: `prefix_other` when `prefix` is
-  `อื่นๆ`) and `studentClassInstanceId()` (class instance for a student's batch + current level;
+  `อื่นๆ`), `formatAddressLines()` (a students/book_confirmations address as display lines) and `studentClassInstanceId()` (class instance for a student's batch + current level;
   `null` if not created yet). Used by `checkin.php`, `lookup.php`, `admin/approvals.php`,
   `admin/reports.php`.
 - `date_helpers.php` — `formatDateBEShort()`: renders an ISO date as a short Thai Buddhist-Era date
@@ -150,7 +152,8 @@ Both "ลงทะเบียนเลย" (the welcome screen's link and the p
   abroad (free-text country/state/city/postcode, no sub-district). The three callers
   build their INSERT/UPDATE from `STUDENT_DETAIL_COLUMNS` + `studentDetailParams()`, so a new
   student field is added in this file (plus the form, schema and a migration). Change validation
-  here, not in the callers.
+  here, not in the callers. The address block is checked by `validateAddressFields($raw, $strict)`
+  and the phone by `isValidPhone()`, both shared with `validateBookShipping()` (`books.php`).
 - `student_form.php` — `studentChoiceField()` + `studentChoiceScript()`: renders a
   `STUDENT_CHOICE_FIELDS` question as its control type (`radio`, `select`, or `multi` = the
   browser's `<select multiple>` posted as `field[]` and stored comma-joined) with a
@@ -241,6 +244,21 @@ cancels/un-cancels them; an unknown ID redirects back to `classes.php`. A class'
 always its **first non-cancelled session's date**, derived in both pages (`—` / ยังไม่มีตารางเรียน
 when there's no schedule). `class_instances.start_date` is a legacy nullable column
 (`migrations/2026-11-class-start-date-optional.sql`) that nothing reads or writes; don't bring it back.
+
+**ยืนยันการรับหนังสือ (book shipping).** The books are free, so wording says รับหนังสือ /
+จัดส่งหนังสือ, never สั่งซื้อ/ซื้อ. `admin/classes.php` opens or closes it per ห้องเรียน
+(`class_instances.book_confirmation_open`, `migrations/2026-11-book-confirmations.sql`), for any
+class whatever its `is_closed`. While any class is open, `index.php` shows the menu. `books.php`
+works like this: student ID + name, then the student's current class must be open. The verified
+IDs go into `$_SESSION['book_confirm']`, never hidden fields. The page then shows the registration
+address on the left. The "ยืนยันการรับหนังสือ" button reveals the shipping form on the right
+(recipient name, phone, `addressFields()`). "ใช้ที่อยู่เดียวกับที่ลงทะเบียน" copies the
+registration address client-side. A confirmation is stored once per student per ห้องเรียน
+(`book_confirmations` UNIQUE key; a duplicate-key race is treated as already confirmed) and shown
+read-only afterwards. `same_as_registration` is computed server-side by comparing addresses.
+`admin/reports.php?view=books` shows per-class counts, a per-class shipping list and a per-student
+view. It uses the same four filters, and its CSV is the shipping list (`BOOK_COLUMNS` /
+`bookRowValues()`). It stays available after closing.
 
 `admin/import_students.php` (feature 6): CSV-imported students skip approval. They're inserted as
 `approved` with the file's student ID, a batch derived from that ID (all but the last 3 digits) and

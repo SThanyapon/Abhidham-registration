@@ -164,7 +164,7 @@ CREATE TABLE otp_codes (
 -- client IP; admin login and OTP verification use narrower identifiers (see section 6).
 CREATE TABLE rate_limit_hits (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    form_key VARCHAR(50) NOT NULL,         -- 'register', 'checkin', 'lookup', 'admin_login',
+    form_key VARCHAR(50) NOT NULL,         -- 'register', 'checkin', 'lookup', 'book_confirm', 'admin_login',
                                             -- 'admin_login_account', 'otp_verify'
     identifier VARCHAR(100) NOT NULL,      -- IP address, username, or pending admin ID
     hit_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -184,6 +184,22 @@ CREATE TABLE backup_runs (
 CREATE TABLE app_settings (
     setting_key VARCHAR(100) PRIMARY KEY,
     setting_value TEXT NOT NULL
+);
+
+-- ยืนยันการรับหนังสือ (section 4.4): opened per ห้องเรียน by class_instances.book_confirmation_open;
+-- one shipping address per student and class, never edited by the student afterwards
+CREATE TABLE book_confirmations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL REFERENCES students(id),
+    class_instance_id INT NOT NULL REFERENCES class_instances(id),
+    recipient_name VARCHAR(255) NOT NULL,
+    phone VARCHAR(50) NOT NULL,
+    address TEXT NOT NULL,                 -- street address; the parts below as in students
+    country VARCHAR(100), province VARCHAR(100), district VARCHAR(100),
+    sub_district VARCHAR(100), postal_code VARCHAR(20),
+    same_as_registration BOOLEAN NOT NULL DEFAULT FALSE, -- address equals the registration one
+    confirmed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (student_id, class_instance_id)
 );
 ```
 
@@ -280,6 +296,23 @@ Every result also echoes the searched name (after whitespace normalization) as
 "ชื่อ-นามสกุล: …", prefixed with the registration's คำนำหน้า when one was found, so the user can
 spot a typo.
 
+### 4.4 Book shipping confirmation (`books.php`)
+The course textbooks are free; students only confirm where to send them ("ยืนยันการรับหนังสือ",
+never purchase wording). An admin opens it per ห้องเรียน on `admin/classes.php`
+(`class_instances.book_confirmation_open`); `index.php` shows the menu only while at least one
+class has it open.
+1. Student ID + name (exact match, approved, rate-limited as `book_confirm`). The student's current
+   class (`studentClassInstanceId()`) must have confirmation open; otherwise it is refused. The
+   verified student and class are kept in `$_SESSION['book_confirm']` for the next step.
+2. Left: the registration address, read-only, with a "ยืนยันการรับหนังสือ" button. It reveals the
+   shipping form on the right: recipient name and phone (prefilled from registration) and the same
+   `addressFields()` block as registration. "ใช้ที่อยู่เดียวกับที่ลงทะเบียน" copies the registration
+   address into it (still editable).
+3. Submit: validated by `validateBookShipping()` (strict postcode chain, as for registration) and
+   inserted into `book_confirmations`; `same_as_registration` records whether the saved address
+   equals the registration one. Once per student per ห้องเรียน (UNIQUE key); a student who already
+   confirmed sees the saved details read-only. Corrections go through staff.
+
 ## 5. Admin/backend features
 
 OTP login: 6-digit code emailed to the admin's registered email, hashed and stored in
@@ -334,6 +367,8 @@ Three pages, รุ่น → ห้องเรียน → ตารางเ
   are refused server-side, and its schedule is read-only; students can still view their progress
   on `checkin.php`. The form posts the target state explicitly and the page redirects after each
   POST, so a refresh can't flip it back.
+- Open or close ยืนยันการรับหนังสือ (`class_instances.book_confirmation_open`, section 4.4) for any
+  class, independent of `is_closed`; posted explicitly with a redirect, like closing.
 - The จัดการตารางเรียน link, shown only for each batch's highest class level, opens
   `admin/schedule.php?class_instance_id=` for that class.
 
@@ -385,7 +420,7 @@ beyond that point (already supported via override + the `UNIQUE` constraint on
 
 ### Feature 3 — Reports
 Restricted to admins with feature 3 permission (`admin/reports.php`). A toggle at the top
-switches between two views (`?view=approved|rejected`, default `approved`):
+switches between three views (`?view=approved|rejected|books`, default `approved`):
 
 **นักศึกษาที่อนุมัติแล้ว (approved)** — attendance report for either a single selected student or
 all approved students at once:
@@ -414,8 +449,23 @@ all approved students at once:
 วันที่สมัคร (BE short date). Sortable by prefix/name/batch/date, newest first by default. Rejected rows have no
 `student_no` or `current_class_level_id`, so this view queries without the `class_levels` join.
 
-**Filters** — a รุ่น dropdown (both views), a ระดับชั้น dropdown (current level; approved view
-only) and a ห้องเรียน dropdown (approved view only), `?batch_id=` / `?level_id=` /
+**ยืนยันการรับหนังสือ (books)** — stays available after confirmation is closed:
+- **Summary** (default): one row per ห้องเรียน that is open or has any confirmation, with
+  เปิด/ปิด, ยืนยันแล้ว, ยังไม่ยืนยัน, นักศึกษาในห้อง (approved students of the batch whose current
+  level is the class's, plus those who confirmed there and were promoted since) and %. Each class
+  links to its detail.
+- **ห้องเรียน detail** (`?class_instance_id=`): the confirmations, ordered by student ID — student
+  ID, prefix, registered name, recipient name and phone, address, ตำบล, อำเภอ, จังหวัด, postcode,
+  country, ใช้ที่อยู่ที่ลงทะเบียน, confirmed date.
+- **Single student** (`?student_id=`): each of the student's classes in that set, with its
+  shipping details or ยังไม่ยืนยัน.
+- The CSV is the shipping list for the shipping staff (the detail columns plus รุ่น and ห้องเรียน)
+  for the chosen class, the chosen student, or every class in the summary.
+- All four filters apply. ระดับชั้น narrows the summary and the shipping list by the class's
+  level, and the student dropdown by current level, as in the approved view.
+
+**Filters** — a รุ่น dropdown (every view), a ระดับชั้น dropdown (current level; approved and
+books views) and a ห้องเรียน dropdown (approved and books views), `?batch_id=` / `?level_id=` /
 `?class_instance_id=`, default all. They narrow the summary table, the student dropdown and the
 CSV export, and are kept across sorting and view switching (ระดับชั้น and ห้องเรียน are dropped on
 the rejected view). Changing a filter resets the student selection to all students; changing รุ่น
@@ -506,7 +556,7 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
   Admin sessions expire after `ADMIN_IDLE_TIMEOUT_SECONDS` (1 hour) idle.
 - **CSV exports**: `csvSafe()` neutralises formula-leading values (CSV/Excel injection).
 - **Mail**: the SMTP client aborts instead of authenticating if STARTTLS fails.
-- **Deployment**: nginx serves an allowlist (`/`, the four public `.php` entry points,
+- **Deployment**: nginx serves an allowlist (`/`, the five public `.php` entry points,
   `/admin/*.php`, `/assets/`) and returns 404 for everything else, so config (incl. `.bak` copies),
   `includes/`, `cron/`, `scripts/`, `migrations/`, `backups/`, `logs/`, `.git` and the docs are
   unreachable. An earlier deny-list config missed `backups/`, so backups were downloadable by exact
@@ -533,6 +583,7 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
 ├── register.php         -> registration POST handler (validation, insert as pending)
 ├── checkin.php          -> check-in / view attendance progress
 ├── lookup.php           -> student ID + registration status lookup
+├── books.php            -> ยืนยันการรับหนังสือ (book shipping address, once per student per ห้องเรียน)
 ├── includes/
 │   ├── db.php
 │   ├── auth.php            (admin session + permission checks)

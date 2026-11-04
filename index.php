@@ -16,6 +16,10 @@ $batch = $mysqli->query(
     'SELECT id, batch_no, name FROM batches WHERE registration_open = 1 ORDER BY id DESC LIMIT 1'
 )->fetch_assoc();
 $showForm = isset($_GET['register']) || $registerError !== null;
+// The ยืนยันการรับหนังสือ menu shows while any ห้องเรียน has it open (admin/classes.php).
+$bookConfirmationOpen = (bool) $mysqli->query(
+    'SELECT 1 FROM class_instances WHERE book_confirmation_open = 1 LIMIT 1'
+)->fetch_row();
 
 // While registration is open, the poster pops up on a visitor's first page view of the session
 // (never over the form or the success page).
@@ -52,6 +56,7 @@ function choiceField(array $old, string $field, string $caption, bool $required 
         <a href="index.php?register=1">ลงทะเบียน</a>
         <a href="checkin.php">ลงชื่อ/ตรวจสอบการเข้าเรียน</a>
         <a href="lookup.php">ค้นหารหัสนักศึกษา</a>
+        <?php if ($bookConfirmationOpen): ?><a href="books.php">ยืนยันการรับหนังสือ</a><?php endif; ?>
         <a class="nav-admin" href="admin/login.php">ผู้ดูแลระบบ</a>
     </nav>
 
@@ -100,6 +105,10 @@ function choiceField(array $old, string $field, string $caption, bool $required 
     <?php if (!$showForm): ?>
         <p>ยินดีต้อนรับ กด "ลงทะเบียน" เพื่อเริ่มลงทะเบียนเรียนพระอภิธรรม</p>
         <p><a class="cta-button" href="index.php?register=1">ลงทะเบียนเลย</a></p>
+        <?php if ($bookConfirmationOpen): ?>
+            <p class="notice">นักศึกษาปัจจุบัน: เปิดให้ยืนยันที่อยู่สำหรับจัดส่งหนังสือเรียนแล้ว
+                <a href="books.php">ยืนยันการรับหนังสือ</a></p>
+        <?php endif; ?>
     <?php elseif (!$batch): ?>
         <p class="error">ขณะนี้ปิดรับลงทะเบียน กรุณากลับมาใหม่ภายหลัง</p>
     <?php else: ?>

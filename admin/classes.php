@@ -56,6 +56,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $notice = $isClosed
             ? 'ปิดห้องเรียนแล้ว นักศึกษาจะลงชื่อเข้าเรียนห้องนี้ไม่ได้'
             : 'เปิดห้องเรียนแล้ว';
+    } elseif ($action === 'set_book_confirmation') {
+        $classInstanceId = (int) ($_POST['class_instance_id'] ?? 0);
+        // Posted explicitly, like set_closed. Independent of is_closed: books may go out after a class ends.
+        $isOpen = ($_POST['book_confirmation_open'] ?? '') === '1' ? 1 : 0;
+
+        $stmt = $mysqli->prepare('UPDATE class_instances SET book_confirmation_open = ? WHERE id = ?');
+        $stmt->bind_param('ii', $isOpen, $classInstanceId);
+        $stmt->execute();
+        $stmt->close();
+        $notice = $isOpen
+            ? 'เปิดยืนยันการรับหนังสือแล้ว นักศึกษาของห้องนี้จะเห็นเมนู "ยืนยันการรับหนังสือ"'
+            : 'ปิดยืนยันการรับหนังสือแล้ว';
     }
 
     // Post/Redirect/Get, so refreshing the page can't repeat the action.
@@ -73,7 +85,7 @@ $classLevels = $mysqli->query('SELECT id, name, sort_order FROM class_levels ORD
     ->fetch_all(MYSQLI_ASSOC);
 
 $classSql =
-    "SELECT ci.id, ci.batch_id, ci.is_closed, cl.name AS level_name, cl.sort_order, b.batch_no, b.name AS batch_name,
+    "SELECT ci.id, ci.batch_id, ci.is_closed, ci.book_confirmation_open, cl.name AS level_name, cl.sort_order, b.batch_no, b.name AS batch_name,
             (SELECT COUNT(*) FROM sessions s WHERE s.class_instance_id = ci.id AND s.is_cancelled = 0) AS session_count,
             (SELECT MIN(s.session_date) FROM sessions s WHERE s.class_instance_id = ci.id AND s.is_cancelled = 0) AS first_session_date
      FROM class_instances ci
@@ -125,13 +137,14 @@ $batchLabel = fn (array $batch): string => ($batch['batch_name'] ?? $batch['name
         <p><a href="classes.php">แสดงห้องเรียนทุกรุ่น</a></p>
     <?php endif; ?>
     <p class="form-note">เมื่อเรียนจบระดับแล้ว ให้ปิดห้องเรียน นักศึกษาจะลงชื่อเข้าเรียนห้องนั้นไม่ได้ (ยังดูความก้าวหน้าได้) และตารางเรียนจะแก้ไขไม่ได้</p>
+    <p class="form-note">ยืนยันการรับหนังสือ: เมื่อเปิด นักศึกษาที่อยู่ในห้องเรียนนั้นจะเห็นเมนู "ยืนยันการรับหนังสือ" ในหน้าแรก และยืนยันที่อยู่จัดส่งหนังสือได้คนละ 1 ครั้งต่อห้องเรียน ดูจำนวนและส่งออกรายชื่อได้ที่รายงาน</p>
 
     <?php if ($classInstances === []): ?>
         <p>ยังไม่มีห้องเรียน</p>
     <?php else: ?>
         <div class="table-wrap"><table>
             <thead>
-                <tr><th>รุ่นที่</th><th>ระดับ</th><th>วันที่เริ่มเรียน</th><th>จำนวนครั้ง</th><th>สถานะ</th><th></th></tr>
+                <tr><th>รุ่นที่</th><th>ระดับ</th><th>วันที่เริ่มเรียน</th><th>จำนวนครั้ง</th><th>สถานะ</th><th></th><th>ยืนยันการรับหนังสือ</th></tr>
             </thead>
             <tbody>
                 <?php foreach ($classInstances as $class): ?>
@@ -160,6 +173,22 @@ $batchLabel = fn (array $batch): string => ($batch['batch_name'] ?? $batch['name
                                     <?php endif; ?>
                                 </form>
                             </div>
+                        </td>
+                        <td>
+                            <form action="<?= htmlspecialchars($selfUrl) ?>" method="post" class="inline-form">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="action" value="set_book_confirmation">
+                                <input type="hidden" name="class_instance_id" value="<?= $class['id'] ?>">
+                                <?php if ($class['book_confirmation_open']): ?>
+                                    <span>เปิด</span>
+                                    <input type="hidden" name="book_confirmation_open" value="0">
+                                    <button type="submit" class="danger">ปิดยืนยันการรับหนังสือ</button>
+                                <?php else: ?>
+                                    <span>ปิด</span>
+                                    <input type="hidden" name="book_confirmation_open" value="1">
+                                    <button type="submit" class="secondary">เปิดยืนยันการรับหนังสือ</button>
+                                <?php endif; ?>
+                            </form>
                         </td>
                     </tr>
                 <?php endforeach; ?>
