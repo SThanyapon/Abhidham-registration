@@ -285,12 +285,12 @@ a CSV export (`?export=csv`, carries the current `student_id` selection) for eit
 summary table sorts by clickable column headers (`?sort=student_no|prefix|full_name|batch|level|completed|percent`
 + `&dir=asc|desc`, whitelisted; default `student_no` ascending, ordered by length then value so
 IDs sort numerically). Stored columns sort in SQL; the computed attendance columns sort in PHP, and
-the CSV export follows the same order. A `?view=approved|rejected` toggle (default `approved`)
-switches to a list of rejected applicants (contact details, address parts other than the street
+the CSV export follows the same order. A `?view=approved|rejected|books` toggle (default `approved`;
+`books` is described under ยืนยันการรับหนังสือ above) switches to a list of rejected applicants (contact details, address parts other than the street
 address, the form answers and the application date, sortable by
 prefix/name/batch/date, newest first by default, with its own CSV export); rejected rows have no
 `student_no` or level, so that view skips the `class_levels` join. Optional filters `?batch_id=`
-(both views) and `?level_id=` (current level, approved view only) narrow the table, the student
+(every view) and `?level_id=` (current level; approved and books views) narrow the table, the student
 dropdown and the CSV export; `filterQuery()` carries them through sort, export and view links.
 Student names in the tables link to the single-student grid (current class), which has a back
 link to the list. A `?class_instance_id=` (ห้องเรียน) filter, approved view only, switches the

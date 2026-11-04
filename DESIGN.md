@@ -236,8 +236,9 @@ country is stored as ประเทศไทย. Public registration rejects a 
 the order is ที่อยู่ (street address), เมือง (→ district), รัฐ (→ province), รหัสไปรษณีย์
 (letters/digits/spaces/dashes, up to 20), ประเทศ, all free text stored in the same columns (no
 sub-district); street address, เมือง and ประเทศ are required, รัฐ and รหัสไปรษณีย์ optional. Each
-panel has its own street-address box, so the order can differ. The CSV import and admin edit only format-check the address parts so older
-answers without อำเภอ/ตำบล survive; a blank country there means Thailand. **Required** (marked `*`, enforced client- and server-side): everything
+panel has its own street-address box, so the order can differ. The admin edit only format-checks
+the address parts, and the CSV import checks only the filled parts against the postcode, fixing
+spelling variants (Feature 6). That way older answers without อำเภอ/ตำบล survive; a blank country there means Thailand. **Required** (marked `*`, enforced client- and server-side): everything
 except previous student ID and referring friend — prefix (plus the free-text prefix when "อื่นๆ"),
 name-surname, age (integer 1-120), street address, the address parts above, phone (digits/spaces/
 `-`/`+`, 9-15 digits), LINE name, LINE ID, the four choices (plus their free text when "อื่นๆ"),
@@ -496,7 +497,7 @@ this order (`IMPORT_COLUMNS` in `admin/import_students.php`): รหัสนั
 New columns are only ever appended, so files made from an older, shorter template still import.
 A choice column holds one of its options or free text (stored as อื่นๆ + that text);
 ทราบข่าวจากช่องทางใด may list several options separated by commas. A blank ประเทศ means Thailand
-(stored as ประเทศไทย). The address parts are only format-checked (no postcode lookup).
+(stored as ประเทศไทย). Thai address parts are matched against the postcode data (see below).
 UTF-8 (with or without BOM) and Windows-874 files are both accepted.
 - Imported students are inserted directly as `approved` with the student ID from the file — no
   approval step.
@@ -691,6 +692,17 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
 - **Backup moved from feature 5 to feature 9** — feature 5 is now unused. On an existing database
   run `UPDATE admin_permissions SET feature = 9 WHERE feature = 5;` (no collision, since 9 was
   unused before).
+- **Book shipping confirmation (November 2026)** — added after the initial design (section 4.4).
+  - Opened per ห้องเรียน rather than per batch, because each level has its own books.
+  - Once per student per class, enforced by a UNIQUE key; corrections go through staff.
+  - The books are free, so no wording mentions buying or ordering.
+- **CSV import checks addresses against the postcode data (November 2026)** — student 6412 was
+  imported with จังหวัด กรุงเทพฯ, so the registration address they copied on `books.php` failed
+  the strict chain check (the data says กรุงเทพมหานคร).
+  - The import now matches each filled จังหวัด/อำเภอ/ตำบล to the postcode, rewrites variant
+    spellings to the data's and skips rows that don't fit.
+  - Blank parts stay allowed for older files.
+  - `scripts/normalize_addresses.php` fixed rows imported earlier.
 - **Two-column dashboard** — the admin dashboard's feature cards are a fixed two-column grid
   (one column on phones) instead of an auto-fill grid.
 - **Admin account management** — Feature 0 originally only created admins. It now also resets

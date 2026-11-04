@@ -237,6 +237,26 @@ When a batch finishes a level, close that class on `/admin/classes.php` (ปิ�
 no longer check in to it (they can still view their progress) and its schedule becomes read-only.
 It can be reopened from the same page.
 
+### Book shipping confirmation (ยืนยันการรับหนังสือ)
+
+The textbooks are free; students only confirm the address to ship them to.
+1. **Open it:** on `/admin/classes.php`, click เปิดยืนยันการรับหนังสือ on the class whose books are
+   going out. While any class is open, `/` shows the ยืนยันการรับหนังสือ menu. Students of that
+   class (their current ห้องเรียน) confirm on `/books.php`, once each.
+2. **Follow progress:** `/admin/reports.php` → ยืนยันการรับหนังสือ tab shows the confirmed and
+   not-yet-confirmed counts per class. Click a class for its shipping list. The CSV export is the
+   list for the shipping staff.
+3. **Close it:** click ปิดยืนยันการรับหนังสือ on the same page. The menu disappears; the report
+   and CSV stay available.
+
+On a database that predates this feature, apply `migrations/2026-11-book-confirmations.sql` and add
+`'book_confirm'` to `config.local.php['rate_limit']` (see `config.local.php.example`). Before opening
+it for imported students, run `php scripts/normalize_addresses.php` (then `--apply`). Otherwise a
+registration address whose จังหวัด/อำเภอ/ตำบล doesn't fit its postcode (e.g. กรุงเทพฯ) is refused
+when the student copies it.
+
+### CSV import
+
 CSV-imported students also need their batch to exist first; the import refuses a file that
 references a batch that hasn't been created.
 
@@ -296,8 +316,11 @@ Production runs the app as a git checkout of this repo, owned by the web server 
    `mysql <db name> < migrations/<file>.sql`. `schema.sql` already includes them for fresh installs.
    Migrations are written so the code already running keeps working, so apply them **before** the
    pull: new code may depend on them (e.g. `2026-11-class-start-date-optional.sql` must run before
-   the code that stops writing `class_instances.start_date`, and `2026-11-class-closed.sql` before
-   the code that reads `class_instances.is_closed`). On a host with Git auto-deploy, which
+   the code that stops writing `class_instances.start_date`, `2026-11-class-closed.sql` before
+   the code that reads `class_instances.is_closed`, and `2026-11-book-confirmations.sql` before the
+   code that reads `class_instances.book_confirmation_open`, which `index.php` queries on every visit).
+   A deploy that adds a `config.local.php` key (e.g. `rate_limit.book_confirm`) also needs it added
+   to the server's copy. A missing rate-limit key silently means no limit. On a host with Git auto-deploy, which
    publishes on every push, apply them before pushing.
 4. Pull as the web server user so file ownership stays consistent with the cron jobs:
    `sudo -u www-data git -C <app dir> pull --ff-only`
@@ -371,8 +394,13 @@ one can brute-force an account:
   only ever appended, so files made from an older, shorter template still import. "ทราบข่าวจากช่องทางใด"
   may list several options separated by commas; "รหัสนักศึกษาเดิม" is kept only when
   "นักศึกษาเก่าหรือใหม่" is the เก่า option. A blank "ประเทศ" (the last columns are ประเทศ,
-  อำเภอ/เขต, ตำบล/แขวง) means Thailand. Imported addresses are only format-checked, not matched
-  against the postcode list.
+  อำเภอ/เขต, ตำบล/แขวง) means Thailand.
+  - **Thai addresses with a postcode** are matched against the postcode list. Each filled
+    จังหวัด/อำเภอ/ตำบล must belong to the postcode, or the row is skipped.
+  - **Variant spellings** (กรุงเทพฯ, กทม., the จ./อ./ต./เขต/แขวง prefixes) are stored with the
+    list's spelling, and the page lists every correction.
+  - **Blank parts** are allowed.
+  - **Students imported before this check:** run `scripts/normalize_addresses.php`.
 - The registration form's Thai address lookup (`assets/data/thai_postcodes.json`, postcode →
   จังหวัด → อำเภอ → ตำบล) is a static snapshot generated from `geography.json` of
   [thailand-geography-json](https://github.com/thailand-geography-data/thailand-geography-json)
