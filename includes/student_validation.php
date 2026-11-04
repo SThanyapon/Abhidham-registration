@@ -317,6 +317,79 @@ function validateAddressFields(array $raw, bool $strict): array
     return [$clean, $missing, $error];
 }
 
+/**
+ * Comparison key for a จังหวัด/อำเภอ/ตำบล name, so spelling variants match the postcode data: drops a
+ * leading จังหวัด/จ./กิ่งอำเภอ/อำเภอ/อ./เขต/ตำบล/ต./แขวง, all spaces and dots, and treats any
+ * กรุงเทพ... or กทม as กรุงเทพมหานคร.
+ */
+function thaiAddressKey(string $name): string
+{
+    $key = preg_replace('/^(จังหวัด|กิ่งอำเภอ|อำเภอ|ตำบล|แขวง|เขต|จ\.|อ\.|ต\.)\s*/u', '', cleanText($name));
+    $key = preg_replace('/[\s.]+/u', '', (string) $key);
+
+    return str_starts_with($key, 'กรุงเทพ') || $key === 'กทม' ? 'กรุงเทพมหานคร' : $key;
+}
+
+/**
+ * Checks a Thai address's จังหวัด/อำเภอ/ตำบล against its postcode in thaiPostcodes() and rewrites
+ * them with the postcode data's spelling (e.g. กรุงเทพฯ -> กรุงเทพมหานคร, อ.เมืองเชียงใหม่ ->
+ * เมืองเชียงใหม่). Only filled parts are checked; a blank part is filled in when the postcode leaves
+ * a single possibility. Rows abroad or without a postcode are returned unchanged. Used by the CSV
+ * import and scripts/normalize_addresses.php.
+ *
+ * Returns [$fixed, $corrections, $error]: the values with corrected spellings, the Thai
+ * descriptions of what changed ("จังหวัด: กรุงเทพฯ → กรุงเทพมหานคร"), and the first mismatch
+ * (null when the address fits the postcode).
+ */
+function matchThaiPostcodeAddress(array $values): array
+{
+    $postcode = (string) ($values['postal_code'] ?? '');
+    if (studentResidence($values) !== RESIDENCE_THAILAND || $postcode === '') {
+        return [$values, [], null];
+    }
+    $provinces = thaiPostcodes()[$postcode] ?? null;
+    if (!is_array($provinces)) {
+        return [$values, [], "ไม่พบรหัสไปรษณีย์ $postcode ในฐานข้อมูลรหัสไปรษณีย์"];
+    }
+
+    // Every [province, district, sub_district] the postcode allows, narrowed by each filled part.
+    $chains = [];
+    foreach ($provinces as $province => $districts) {
+        foreach ($districts as $district => $subDistricts) {
+            foreach ($subDistricts as $subDistrict) {
+                $chains[] = ['province' => $province, 'district' => $district, 'sub_district' => $subDistrict];
+            }
+        }
+    }
+
+    $parts = ['province' => 'จังหวัด', 'district' => 'อำเภอ/เขต', 'sub_district' => 'ตำบล/แขวง'];
+    foreach ($parts as $field => $label) {
+        $value = (string) ($values[$field] ?? '');
+        if ($value === '') {
+            continue;
+        }
+        $key = thaiAddressKey($value);
+        $chains = array_values(array_filter($chains, fn (array $c): bool => thaiAddressKey($c[$field]) === $key));
+        if ($chains === []) {
+            return [$values, [], "$label \"$value\" ไม่ตรงกับรหัสไปรษณีย์ $postcode"];
+        }
+    }
+
+    // Each part that the remaining chains agree on takes the postcode data's spelling.
+    $corrections = [];
+    foreach ($parts as $field => $label) {
+        $options = array_unique(array_column($chains, $field));
+        $old = (string) ($values[$field] ?? '');
+        if (count($options) !== 1 || $old === $options[0]) {
+            continue;
+        }
+        $values[$field] = $options[0];
+        $corrections[] = "$label: " . ($old === '' ? '(ว่าง)' : $old) . ' → ' . $options[0];
+    }
+
+    return [$values, $corrections, null];
+}
+
 // Digits, spaces, '-' and '+' only, with 9-15 digits (Thai landline/mobile, or +66...).
 function isValidPhone(string $phone): bool
 {

@@ -279,6 +279,10 @@ Point Windows Task Scheduler (or cron on Linux) at both on whatever interval you
   `AUTO_INCREMENT = 1`. Admin accounts, permissions, `class_levels` and `app_settings` are kept.
 - `scripts/normalize_whitespace.php` — one-off cleanup that applies the input whitespace rules
   (`includes/input.php`) to rows stored before those rules existed. Idempotent; back up first.
+- `scripts/normalize_addresses.php` — one-off cleanup that rewrites students' จังหวัด/อำเภอ/ตำบล to
+  the postcode data's spelling (e.g. กรุงเทพฯ → กรุงเทพมหานคร), the same check the CSV import
+  applies, and lists the addresses that don't fit their postcode. Dry run by default; `--apply`
+  writes. Idempotent; back up first.
 
 ## Deploying
 

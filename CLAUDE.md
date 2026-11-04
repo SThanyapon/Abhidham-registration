@@ -46,6 +46,9 @@ php cron/clear_expired_otp.php
 
 # One-off: apply includes/input.php whitespace rules to rows stored before they existed (idempotent)
 php scripts/normalize_whitespace.php
+
+# One-off: rewrite students' จังหวัด/อำเภอ/ตำบล to the postcode JSON's spelling (dry run unless --apply)
+php scripts/normalize_addresses.php [--apply]
 ```
 
 First-time setup requires copying `config.local.php.example` to `config.local.php` (gitignored) and
@@ -264,7 +267,12 @@ view. It uses the same four filters, and its CSV is the shipping list (`BOOK_COL
 `approved` with the file's student ID, a batch derived from that ID (all but the last 3 digits) and
 a starting level the admin chooses. Batches are never auto-created: if any row references a batch
 that doesn't exist, the whole file is refused (nothing imported) and the missing batch numbers listed.
-`noteImportedStudentNo()` bumps `student_id_sequences`. Invalid rows are skipped and reported, not
+`noteImportedStudentNo()` bumps `student_id_sequences`. A Thai address is checked against the
+postcode JSON by `matchThaiPostcodeAddress()` (`includes/student_validation.php`). Each filled
+จังหวัด/อำเภอ/ตำบล must belong to the postcode; variant spellings are rewritten through
+`thaiAddressKey()`, e.g. กรุงเทพฯ → กรุงเทพมหานคร, and the page lists these corrections. Blank parts
+are allowed. `scripts/normalize_addresses.php` applies the same check to students already stored.
+Invalid rows are skipped and reported, not
 fatal. Columns are read by position (`IMPORT_COLUMNS`), so new columns are only ever appended to
 the end (the latest are ประเทศ, อำเภอ/เขต, ตำบล/แขวง; a blank country means Thailand) and older,
 shorter files keep importing. `admin/students.php` (feature 7) looks a student up by exact ID +

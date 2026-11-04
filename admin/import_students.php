@@ -53,6 +53,7 @@ $levelNames = array_column($levels, 'name', 'id');
 $error = null;
 $summary = null;
 $skipped = [];
+$corrected = []; // imported rows whose จังหวัด/อำเภอ/ตำบล were rewritten to the postcode data's spelling
 $selectedLevelId = (int) ($levels[0]['id'] ?? 0);
 
 // Reads the uploaded file as UTF-8 text: strips a BOM, and converts from Windows-874 (Thai Excel's
@@ -172,6 +173,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $studentNo = cleanCode((string) $raw['student_no']);
 
             [$student, $validationError] = validateStudentFields($raw);
+            $addressCorrections = [];
+            if ($validationError === null) {
+                // Thai addresses must fit the postcode data; variant spellings are rewritten to it.
+                [$student, $addressCorrections, $validationError] = matchThaiPostcodeAddress($student);
+            }
 
             $reason = null;
             if (!preg_match('/^[0-9]{4,10}$/', $studentNo)) {
@@ -222,6 +228,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             noteImportedStudentNo($mysqli, $batchId, $studentNo);
             $imported++;
+            if ($addressCorrections !== []) {
+                $corrected[] = "แถว $rowNumber (รหัส $studentNo): " . implode(', ', $addressCorrections);
+            }
         }
 
         $findNo->close();
@@ -264,6 +273,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </ul>
         </div>
     <?php endif; ?>
+    <?php if ($corrected !== []): ?>
+        <div class="notice">
+            <strong>แก้ไขที่อยู่ให้ตรงกับฐานข้อมูลรหัสไปรษณีย์:</strong>
+            <ul>
+                <?php foreach ($corrected as $line): ?>
+                    <li><?= htmlspecialchars($line) ?></li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+    <?php endif; ?>
 
     <div class="card">
         <p>นักศึกษาที่นำเข้าจะได้รับการอนุมัติทันทีโดยใช้รหัสนักศึกษาตามไฟล์ รุ่นจะคำนวณจากรหัสนักศึกษา
@@ -273,6 +292,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
            <?= htmlspecialchars(implode(', ', IMPORT_COLUMNS)) ?></p>
         <p class="form-note">คอลัมน์ตั้งแต่ "จังหวัด" เป็นต้นไปไม่บังคับ (ไฟล์แบบเดิมที่มีถึงคอลัมน์ "ผู้แนะนำ" ยังนำเข้าได้)
            คอลัมน์ที่เป็นตัวเลือก ให้ใส่ข้อความตามตัวเลือกในแบบฟอร์มลงทะเบียน หรือข้อความอื่น (บันทึกเป็น "อื่นๆ")</p>
+        <p class="form-note">ที่อยู่ในประเทศไทยจะตรวจกับฐานข้อมูลรหัสไปรษณีย์: จังหวัด อำเภอ/เขต ตำบล/แขวง (ที่กรอกไว้) ต้องอยู่ในรหัสไปรษณีย์นั้น
+           ชื่อที่เขียนต่างกันเล็กน้อย เช่น กรุงเทพฯ, จ./อ./ต. จะถูกแก้เป็นชื่อตามฐานข้อมูลให้อัตโนมัติ แถวที่ไม่ตรงจะไม่ถูกนำเข้า</p>
         <p><a href="import_students.php?template=1">ดาวน์โหลดไฟล์ตัวอย่าง (CSV)</a></p>
     </div>
 

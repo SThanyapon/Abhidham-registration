@@ -511,6 +511,17 @@ UTF-8 (with or without BOM) and Windows-874 files are both accepted.
   listed with its row number and reason, if it fails validation, its student ID already exists (in
   the DB or earlier in the file), or its name already belongs to an approved/pending student.
   Valid rows are still imported.
+- A Thai address with a postcode is checked against the postcode data (`matchThaiPostcodeAddress()`):
+  - Each filled จังหวัด/อำเภอ/ตำบล must belong to that postcode, otherwise the row is skipped with
+    the reason.
+  - Variant spellings are stored with the data's spelling (`thaiAddressKey()`: กรุงเทพฯ/กทม →
+    กรุงเทพมหานคร, จ./อ./ต./อำเภอ/เขต/ตำบล/แขวง prefixes and spaces ignored), and a blank part is
+    filled in when the postcode allows only one.
+  - The page lists these corrections after the import.
+  - Blank parts are allowed, so older files without อำเภอ/ตำบล still import.
+  - Students imported before this check are fixed with `scripts/normalize_addresses.php`, which
+    does a dry run unless given `--apply`. Otherwise their registration address fails `books.php`'s
+    strict check, as it did with กรุงเทพฯ.
 - Each imported ID raises `student_id_sequences.last_seq` for its batch + group (inverting the
   section 5 digit math, `noteImportedStudentNo()`), so later auto-generated IDs don't collide.
 
@@ -601,7 +612,8 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
 │   └── date_helpers.php    (formatDateBEShort())
 ├── scripts/
 │   ├── create_admin.php
-│   └── normalize_whitespace.php  (one-off cleanup of rows stored before input.php)
+│   ├── normalize_whitespace.php  (one-off cleanup of rows stored before input.php)
+│   └── normalize_addresses.php   (one-off: จังหวัด/อำเภอ/ตำบล to the postcode data's spelling)
 ├── admin/
 │   ├── login.php
 │   ├── verify_otp.php
