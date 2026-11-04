@@ -24,9 +24,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $stmt = $mysqli->prepare('INSERT INTO batches (batch_no, name) VALUES (?, ?)');
             $stmt->bind_param('is', $batchNo, $name);
-            $stmt->execute();
+            try {
+                $stmt->execute();
+                $notice = "เปิดรุ่นที่ $batchNo เรียบร้อยแล้ว";
+            } catch (mysqli_sql_exception $e) {
+                // batch_no is UNIQUE; catching the error (not checking first) also covers a race.
+                if ($e->getCode() !== 1062) {
+                    throw $e;
+                }
+                $error = "รุ่นที่ $batchNo มีอยู่แล้ว กรุณาใช้หมายเลขรุ่นอื่น";
+            }
             $stmt->close();
-            $notice = "เปิดรุ่นที่ $batchNo เรียบร้อยแล้ว";
         }
     } elseif ($action === 'toggle_registration') {
         $batchId = (int) ($_POST['batch_id'] ?? 0);

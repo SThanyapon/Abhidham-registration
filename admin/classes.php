@@ -34,15 +34,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $batchId = (int) ($_POST['batch_id'] ?? 0);
         $classLevelId = (int) ($_POST['class_level_id'] ?? 0);
 
-        if ($batchId <= 0 || $classLevelId <= 0) {
+        $batch = null;
+        foreach ($batches as $candidate) {
+            if ((int) $candidate['id'] === $batchId) {
+                $batch = $candidate;
+                break;
+            }
+        }
+        $levelStmt = $mysqli->prepare('SELECT name FROM class_levels WHERE id = ?');
+        $levelStmt->bind_param('i', $classLevelId);
+        $levelStmt->execute();
+        $level = $levelStmt->get_result()->fetch_assoc();
+        $levelStmt->close();
+
+        // An unknown ID (tampered form) would otherwise fail the foreign key.
+        if (!$batch || !$level) {
             $error = 'กรุณาระบุรุ่นและระดับชั้น';
         } else {
             // The start date comes from the schedule (admin/schedule.php), not from here.
             $stmt = $mysqli->prepare('INSERT INTO class_instances (batch_id, class_level_id) VALUES (?, ?)');
             $stmt->bind_param('ii', $batchId, $classLevelId);
-            $stmt->execute();
+            try {
+                $stmt->execute();
+                $notice = 'สร้างห้องเรียนเรียบร้อยแล้ว';
+            } catch (mysqli_sql_exception $e) {
+                // (batch_id, class_level_id) is UNIQUE: one ห้องเรียน per รุ่น and ระดับ.
+                if ($e->getCode() !== 1062) {
+                    throw $e;
+                }
+                $error = 'ห้องเรียน ' . (($batch['name'] ?? '') ?: 'รุ่น ' . $batch['batch_no'])
+                    . ' - ' . $level['name'] . ' มีอยู่แล้ว';
+            }
             $stmt->close();
-            $notice = 'สร้างห้องเรียนเรียบร้อยแล้ว';
         }
     } elseif ($action === 'set_closed') {
         $classInstanceId = (int) ($_POST['class_instance_id'] ?? 0);
