@@ -44,13 +44,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->close();
 
         if ($admin && password_verify($password, $admin['password_hash'])) {
-            $_SESSION['otp_pending_admin_id'] = (int) $admin['id'];
-            generateAndSendOtp((int) $admin['id'], $admin['email']);
-            header('Location: verify_otp.php');
-            exit;
+            if (generateAndSendOtp((int) $admin['id'], $admin['email'])) {
+                $_SESSION['otp_pending_admin_id'] = (int) $admin['id'];
+                header('Location: verify_otp.php');
+                exit;
+            }
+            // The SMTP reply is in the PHP error log (includes/mailer.php).
+            unset($_SESSION['otp_pending_admin_id']);
+            $error = 'ส่งรหัส OTP ทางอีเมลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง หรือติดต่อผู้ดูแลระบบ';
+        } else {
+            $error = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
         }
-
-        $error = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
     }
 }
 ?>

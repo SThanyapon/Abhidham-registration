@@ -160,7 +160,10 @@ Substitute your own domain, paths and PHP version.
    `session.upload_progress.enabled = 0`. The app never uses upload progress, and turning it off
    closes the session path of CVE-2026-109619. The VM keeps these in
    `/etc/php/8.5/mods-available/abhidham-hardening.ini` (first line `; priority=99`), enabled with
-   `sudo phpenmod -v 8.5 abhidham-hardening`. Then restart PHP-FPM. Keep the PHP packages
+   `sudo phpenmod -v 8.5 abhidham-hardening`. Then restart PHP-FPM. PHP-FPM workers have no
+   error log by default, so `error_log()` output (e.g. a refused OTP email) is lost. Give the pool
+   one in `/etc/php/8.5/fpm/pool.d/www.conf`: `php_admin_value[error_log] =
+   /var/log/php8.5-fpm-app.log` (file owned by `www-data`, mode 640, plus a logrotate entry). Keep the PHP packages
    patched (`sudo apt-get update && sudo apt-get upgrade`, then restart PHP-FPM).
 9. **Scheduled jobs** (`sudo crontab -u www-data -e`). Output goes to `logs/`, which nginx never
    serves:

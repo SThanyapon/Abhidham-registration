@@ -110,7 +110,10 @@ Every "ลงทะเบียนเลย" (the registration card's link and t
 - `mailer.php` — a hand-rolled minimal SMTP client (`sendEmail`) used for OTP codes and backup
   files. Plain-text body plus optional attachments (`multipart/mixed`, base64), with SMTP
   dot-stuffing; no Composer/PHPMailer dependency. Aborts (returns false) if STARTTLS fails, so
-  credentials never go out in clear text. Swap this file if HTML email is ever needed.
+  credentials never go out in clear text. Every refused step (connect, auth, MAIL FROM, RCPT TO,
+  DATA, the final send) is `error_log()`ged with the server's reply, never the body (it holds the
+  OTP). `admin/login.php` shows an error instead of going to `verify_otp.php` when the OTP email
+  can't be sent. Swap this file if HTML email is ever needed.
 - `student_id.php` — `generateStudentNo()`: the student ID allocation algorithm. Uses a
   `FOR UPDATE`-locked transaction on `student_id_sequences` (per batch + prefix group running count) to
   avoid races, then derives `{batch_no}{group_digit}{2-digit seq}`. The นาย/นาง/นางสาว/อื่นๆ group

@@ -62,12 +62,23 @@ function sendEmail(string $to, string $subject, string $body, array $attachments
         return false;
     }
 
-    $write('MAIL FROM:<' . $config['from_email'] . '>');
-    $read();
-    $write('RCPT TO:<' . $to . '>');
-    $read();
-    $write('DATA');
-    $read();
+    // Each envelope step must be accepted before the next; a refusal is logged with the server's reply
+    // (never the body, which may hold an OTP code).
+    $steps = [
+        'MAIL FROM' => ['MAIL FROM:<' . $config['from_email'] . '>', ['250']],
+        'RCPT TO' => ['RCPT TO:<' . $to . '>', ['250', '251']],
+        'DATA' => ['DATA', ['354']],
+    ];
+    foreach ($steps as $step => [$command, $accepted]) {
+        $write($command);
+        $response = $read();
+        if (!in_array(substr($response, 0, 3), $accepted, true)) {
+            error_log("SMTP $step rejected: " . trim($response));
+            $write('QUIT');
+            fclose($socket);
+            return false;
+        }
+    }
 
     $headers = "From: {$config['from_name']} <{$config['from_email']}>\r\n";
     $headers .= "To: <$to>\r\n";
@@ -103,5 +114,9 @@ function sendEmail(string $to, string $subject, string $body, array $attachments
     $write('QUIT');
     fclose($socket);
 
-    return strpos($sendResponse, '250') === 0;
+    if (strpos($sendResponse, '250') !== 0) {
+        error_log('SMTP send rejected: ' . trim($sendResponse));
+        return false;
+    }
+    return true;
 }
