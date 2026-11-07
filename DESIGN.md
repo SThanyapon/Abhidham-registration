@@ -165,7 +165,7 @@ CREATE TABLE otp_codes (
 CREATE TABLE rate_limit_hits (
     id INT AUTO_INCREMENT PRIMARY KEY,
     form_key VARCHAR(50) NOT NULL,         -- 'register', 'checkin', 'lookup', 'book_confirm', 'admin_login',
-                                            -- 'admin_login_account', 'otp_verify'
+                                            -- 'admin_login_account', 'otp_verify', 'otp_resend'
     identifier VARCHAR(100) NOT NULL,      -- IP address, username, or pending admin ID
     hit_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX (form_key, identifier, hit_at)
@@ -205,16 +205,28 @@ CREATE TABLE book_confirmations (
 
 ## 4. Public features
 
-### 4.1 Student registration (`index.php`, `register.php`)
-`index.php` is a landing page — the form is not shown until the visitor clicks "ลงทะเบียน"
-(`?register=1`), so a first-time visit doesn't drop straight into a form. While a batch has
-`registration_open = TRUE`, the visitor's first view of the landing page in a session
-(`$_SESSION['landing_seen']`) pops up the intake poster (`assets/images/landingpage.jpg`) in a modal
-`<dialog>`. Clicking the poster or ลงทะเบียนเลย opens the form; ปิด, Esc or a backdrop click closes it.
-The landing page itself also shows ลงทะเบียนเลย; both are a large blue button (`.cta-button`) so
-the way in to the form stands out.
-It never appears over the form, an error or the success page. After a successful submit,
-`?success=1` shows the classroom QR code (`assets/images/qr-code7.jpg`) and the foundation's footer
+### 4.0 Home page and menu (`index.php`, `includes/public_nav.php`)
+`index.php` is a notifications page. It shows one card for each thing students can do right now:
+- a batch with `registration_open = TRUE`: "เปิดรับสมัครนักศึกษาใหม่", batch name, ลงทะเบียนเลย →
+  `registration-form.php`;
+- ห้องเรียน with `book_confirmation_open = 1`: the open classes listed by name, ยืนยันการรับหนังสือ →
+  `books.php`.
+
+With neither open it redirects to `checkin.php`. While a batch has registration open, the visitor's
+first view in a session (`$_SESSION['landing_seen']`) pops up the intake poster
+(`assets/images/landingpage.jpg`) in a modal `<dialog>`. Clicking the poster or ลงทะเบียนเลย opens
+the form; ปิด, Esc or a backdrop click closes it. Every ลงทะเบียนเลย is a large blue button
+(`.cta-button`). Old links `/?register=1` and `/?success=1` redirect to `registration-form.php`
+(with `?success=1`).
+
+Every public page (index, registration-form, checkin, lookup, books) outputs the same menu from
+`publicNav()`: ลงทะเบียน, ลงชื่อ/ตรวจสอบการเข้าเรียน, ค้นหารหัสนักศึกษา, ยืนยันการรับหนังสือ (only while
+at least one ห้องเรียน has it open, `bookConfirmationOpen()`), and ผู้ดูแลระบบ.
+
+### 4.1 Student registration (`registration-form.php`, `register.php`)
+`registration-form.php` shows the form (or "ขณะนี้ปิดรับลงทะเบียน" when no batch is open) and posts
+to `register.php`, the POST handler. After a successful submit, `registration-form.php?success=1`
+shows the classroom QR code (`assets/images/qr-code7.jpg`) and the foundation's footer
 banner. Fields: prefix
 (dropdown starting on a "-- เลือกคำนำหน้า --" placeholder so the choice is explicit, incl.
 "อื่นๆ (ระบุ)" free-text), name-surname, age, mailing address (below), mobile phone, LINE
@@ -248,7 +260,7 @@ in `includes/input.php`); symbols such as `/`, `*`, `&`, `.`, `฿` are rejected
 the Google Form are required only on public registration (`validateStudentFields($raw, true)`); the
 CSV import and admin edit page keep them optional because older students don't have them. On a validation error
 `register.php` stashes the entered values in `$_SESSION['register_old']` and the message in
-`$_SESSION['register_error']`, then redirects to `?register=1`. `index.php` refills the form once,
+`$_SESSION['register_error']`, then redirects to `registration-form.php`, which refills the form once,
 with a message naming the missing fields. The message is never put in the URL, so a crafted link
 can't show arbitrary text on the site. Always targets whichever batch currently has
 `registration_open = TRUE` at level `จูฬตรี`. Inserted as `status = 'pending'`. Rate-limited.
@@ -300,8 +312,8 @@ spot a typo.
 ### 4.4 Book shipping confirmation (`books.php`)
 The course textbooks are free; students only confirm where to send them ("ยืนยันการรับหนังสือ",
 never purchase wording). An admin opens it per ห้องเรียน on `admin/classes.php`
-(`class_instances.book_confirmation_open`); `index.php` shows the menu only while at least one
-class has it open.
+(`class_instances.book_confirmation_open`). While at least one class has it open, every public
+page shows the menu link and `index.php` shows a card (section 4.0).
 1. Student ID + name (exact match, approved, rate-limited as `book_confirm`). The student's current
    class (`studentClassInstanceId()`) must have confirmation open; otherwise it is refused. The
    verified student and class are kept in `$_SESSION['book_confirm']` for the next step.
@@ -318,7 +330,11 @@ class has it open.
 
 OTP login: 6-digit code emailed to the admin's registered email, hashed and stored in
 `otp_codes` with an expiry (e.g. 5 minutes), rate-limited per account. Issuing a code retires the
-account's earlier unused codes, so only the newest is valid. After OTP verification, a session is
+account's earlier unused codes, so only the newest is valid. If the email can't be sent (the SMTP
+server refuses a step), the login page shows an error instead of the OTP page, and the server's reply
+goes to the PHP error log. The OTP page's ส่งรหัสยืนยันการเข้าสู่ระบบอีกครั้ง button emails a new code
+(retiring the previous one) at most once every 120 seconds since the last email, and at most
+3 times per 15 minutes (`otp_resend`). After OTP verification, a session is
 created (with a new session ID). Every admin page checks that the account still exists and is
 active and that the session hasn't been idle for more than 1 hour (`requireAdminLogin()`). It then
 checks `admin_permissions` for the relevant feature number before allowing access. Logout
@@ -550,12 +566,14 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
 
 - **Rate limiting**, thresholds read from `config.local.php['rate_limit']`, sliding window per
   `(form_key, identifier)`:
-  - `register`, `checkin`, `lookup` — keyed by client IP.
+  - `register`, `checkin`, `lookup`, `book_confirm` — keyed by client IP.
   - `admin_login` — keyed by client IP, catches one source spraying many accounts.
   - `admin_login_account` — keyed by username, catches one account attacked from many IPs
     (a purely IP-based limit can't stop a distributed brute force against a single account).
   - `otp_verify` — keyed by the pending admin ID, caps guesses against a valid login's OTP
     code independent of source IP.
+  - `otp_resend` — keyed by the pending admin ID, caps the OTP page's resend button (on top of
+    its fixed 120-second wait between emails).
 - Passwords hashed with `password_hash()` (bcrypt). OTP codes are hashed at rest, single-use and
   short-lived, and only the newest code per account is valid.
 - **Injection and XSS**: all queries that take input are prepared statements (`bind_param`). The only
@@ -568,7 +586,7 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
   Admin sessions expire after `ADMIN_IDLE_TIMEOUT_SECONDS` (1 hour) idle.
 - **CSV exports**: `csvSafe()` neutralises formula-leading values (CSV/Excel injection).
 - **Mail**: the SMTP client aborts instead of authenticating if STARTTLS fails.
-- **Deployment**: nginx serves an allowlist (`/`, the five public `.php` entry points,
+- **Deployment**: nginx serves an allowlist (`/`, the six public `.php` entry points,
   `/admin/*.php`, `/assets/`) and returns 404 for everything else, so config (incl. `.bak` copies),
   `includes/`, `cron/`, `scripts/`, `migrations/`, `backups/`, `logs/`, `.git` and the docs are
   unreachable. An earlier deny-list config missed `backups/`, so backups were downloadable by exact
@@ -591,7 +609,8 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
 ├── config.php
 ├── schema.sql           -> full schema for a fresh install (includes every migration)
 ├── migrations/          -> one-off ALTERs for existing databases, applied once in name order
-├── index.php            -> landing page + registration form
+├── index.php            -> notifications (registration / book confirmation open), else -> checkin.php
+├── registration-form.php -> registration form + success/QR screen
 ├── register.php         -> registration POST handler (validation, insert as pending)
 ├── checkin.php          -> check-in / view attendance progress
 ├── lookup.php           -> student ID + registration status lookup
@@ -610,6 +629,7 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
 │   ├── student_validation.php (validateStudentFields(), shared by register/import/edit)
 │   ├── student_form.php    (studentChoiceField(), addressFields() + their scripts)
 │   ├── student_helpers.php (studentPrefix(), studentClassInstanceId())
+│   ├── public_nav.php      (publicNav(), bookConfirmationOpen(): the public pages' menu)
 │   └── date_helpers.php    (formatDateBEShort())
 ├── scripts/
 │   ├── create_admin.php
@@ -658,9 +678,9 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
    month, 2-digit BE year — Gregorian year + 543), with a weekday label where relevant.
    Underlying storage stays Gregorian ISO (`DATE` columns); conversion only happens at
    display time (`formatDateBEShort()` in `includes/date_helpers.php`).
-7. **Registration landing page** — `index.php` shows a landing page first; the registration
-   form only appears after the visitor clicks "ลงทะเบียน" (`?register=1`), rather than being
-   shown immediately on first load.
+7. **Home page** — `index.php` is a notifications page (registration open, book confirmation
+   open) and redirects to `checkin.php` when there's nothing to announce. The registration form
+   lives on its own page, `registration-form.php`, rather than being shown on first load.
 
 ## 9. Resolved decisions since initial design
 
@@ -735,8 +755,9 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
 - **Backups compressed and emailed** — backups are `.sql.gz` and attached to the email; the
   recipients (several allowed) are edited on the backup page and stored in the new
   `app_settings` table. On an existing database, create it with the one-off SQL in README.md.
-- **Intake poster on the landing page** — while registration is open, the first visit in a
-  session pops up the intake poster, and the success page shows the classroom QR code (section 4.1).
+- **Intake poster on the home page** — while registration is open, the first visit in a
+  session pops up the intake poster (section 4.0), and the success page shows the classroom QR code
+  (section 4.1).
 - **Security review hardening (2026-10)** — a code review found no SQL injection or XSS. It
   added: CSV formula neutralisation in report exports, registration errors carried in the session
   instead of `?error=` (which allowed crafted messages), hardened session cookies plus a 1-hour
@@ -763,8 +784,8 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
   asks for a start date, which duplicated the schedule's own start date and could disagree with
   it. Pages show the first non-cancelled session's date instead. `class_instances.start_date`
   became nullable and unused (`migrations/2026-11-class-start-date-optional.sql`).
-- **Prominent ลงทะเบียนเลย button (2026-11)** — the landing page's ลงทะเบียนเลย link and the poster's
-  button became a large blue `.cta-button` (section 4.1).
+- **Prominent ลงทะเบียนเลย button (2026-11)** — the home page's ลงทะเบียนเลย link and the poster's
+  button became a large blue `.cta-button` (section 4.0).
 - **รุ่น → ห้องเรียน → ตารางเรียน, closing a class (2026-11)** — class management split into three
   pages: batches moved to `admin/batches.php`, and `admin/classes.php` now holds only class
   instances (Feature 1, section 5). A class can be closed once its level is finished, which stops
@@ -774,3 +795,11 @@ cron/Task Scheduler entry. Restore with `gunzip -c <file>.sql.gz | mysql <db nam
 - **Full level titles (2026-11)** — `class_levels.name` became the full title with the short name in
   brackets (e.g. `มัชฌิมอาภิธรรมิกะตรี (มัชฌิมตรี)`), shown on every page and CSV. Data-only change,
   keyed by `sort_order` (`migrations/2026-11-class-level-full-names.sql`).
+- **Notifications home page and shared menu (2026-11)** — the registration form moved from
+  `index.php` to `registration-form.php`. `index.php` became a notifications page (registration
+  open, book confirmation open) that redirects to `checkin.php` when nothing is open, and the
+  ยืนยันการรับหนังสือ menu link moved into `publicNav()` on every public page (section 4.0).
+- **Visible OTP email failures and resend (2026-11)** — `includes/mailer.php` checks and logs each
+  SMTP step, the login page reports a failed OTP email, and the OTP page has a resend button with a
+  120-second wait and the `otp_resend` limit (section 5). Prompted by Outlook soft-bouncing OTP mail
+  from a sender domain without a DMARC record.

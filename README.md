@@ -195,7 +195,7 @@ The app needs no code changes, only:
    The selector may offer nothing below 1024M for uploads and no `error_log` setting; errors then
    go to `error_log` files next to the failing script, which the `.htaccess` allowlist never serves.
 2. **Code**: `git clone` the repo (public, HTTPS) into the domain's `public_html`. The repo's
-   `.htaccess` is the nginx allowlist for Apache/LiteSpeed: only the five public pages,
+   `.htaccess` is the nginx allowlist for Apache/LiteSpeed: only the six public pages,
    `admin/*.php` and static files under `assets/` are served, everything else is 404, and HTTP
    redirects to HTTPS. It also sends the same four security headers as the nginx block and strips
    `X-Powered-By`.
@@ -327,7 +327,7 @@ Production runs the app as a git checkout of this repo, owned by the web server 
    the code that stops writing `class_instances.start_date`, `2026-11-class-closed.sql` before
    the code that reads `class_instances.is_closed`, and `2026-11-book-confirmations.sql` before the
    code that reads `class_instances.book_confirmation_open`, which every public page queries for its menu).
-   A deploy that adds a `config.local.php` key (e.g. `rate_limit.book_confirm`) also needs it added
+   A deploy that adds a `config.local.php` key (e.g. `rate_limit.book_confirm`, `rate_limit.otp_resend`) also needs it added
    to the server's copy. A missing rate-limit key silently means no limit. On a host with Git auto-deploy, which
    publishes on every push, apply them before pushing.
 4. Pull as the web server user so file ownership stays consistent with the cron jobs:
