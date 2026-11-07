@@ -104,9 +104,13 @@ Every "ลงทะเบียนเลย" (the registration card's link and t
   client IP. Admin login (`admin/login.php`) enforces two independent buckets — `admin_login` keyed by
   IP and `admin_login_account` keyed by username — so a distributed attack spread across many IPs is
   still capped per targeted account, not just per source. OTP verification (`admin/verify_otp.php`) adds
-  its own `otp_verify` bucket keyed by the pending admin ID.
+  its own `otp_verify` bucket keyed by the pending admin ID, and its resend button an `otp_resend`
+  bucket (same key).
 - `otp.php` — 6-digit OTP generation/verification for admin login, hashed at rest in `otp_codes`,
   single-use, TTL from config. Issuing a code retires the account's earlier unused codes.
+  `admin/verify_otp.php`'s ส่งรหัสยืนยันการเข้าสู่ระบบอีกครั้ง button issues a new code at most every
+  120 s (`OTP_RESEND_COOLDOWN_SECONDS`, from `$_SESSION['otp_sent_at']`, set by `login.php`) and
+  redirects after the POST with the result in `$_SESSION['otp_flash']`.
 - `mailer.php` — a hand-rolled minimal SMTP client (`sendEmail`) used for OTP codes and backup
   files. Plain-text body plus optional attachments (`multipart/mixed`, base64), with SMTP
   dot-stuffing; no Composer/PHPMailer dependency. Aborts (returns false) if STARTTLS fails, so

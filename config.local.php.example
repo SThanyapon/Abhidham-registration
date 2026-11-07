@@ -26,6 +26,7 @@ return [
         'admin_login' => ['max_attempts' => 5, 'window_seconds' => 900],
         'admin_login_account' => ['max_attempts' => 10, 'window_seconds' => 900],
         'otp_verify' => ['max_attempts' => 5, 'window_seconds' => 300],
+        'otp_resend' => ['max_attempts' => 3, 'window_seconds' => 900],
     ],
 
     'otp' => [

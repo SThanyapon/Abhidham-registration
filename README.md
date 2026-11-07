@@ -60,7 +60,8 @@ original requirements.
      it open on `admin/classes.php`): student ID + name, then the registration address on the left and,
      after "ยืนยันการรับหนังสือ", a shipping form on the right (recipient name, phone, address;
      "ใช้ที่อยู่เดียวกับที่ลงทะเบียน" copies the registration address). Once per student per ห้องเรียน
-   - `/admin/login.php` — admin backend (username/password, then an emailed OTP code). The
+   - `/admin/login.php` — admin backend (username/password, then an emailed OTP code;
+     the OTP page can resend it, at most every 2 minutes). The
      dashboard shows, in two columns, only the features the admin has been granted:
 
      | # | Page | Feature |
@@ -352,6 +353,8 @@ one can brute-force an account:
 - `admin_login` — by IP, catches one source spraying many accounts.
 - `admin_login_account` — by username, catches one account attacked from many IPs.
 - `otp_verify` — by the pending admin ID, caps guesses against a valid login's OTP code.
+- `otp_resend` — by the pending admin ID, caps the OTP page's resend button (on top of its fixed
+  120-second wait between emails).
 
 ## Security notes
 

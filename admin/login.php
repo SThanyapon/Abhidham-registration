@@ -46,6 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($admin && password_verify($password, $admin['password_hash'])) {
             if (generateAndSendOtp((int) $admin['id'], $admin['email'])) {
                 $_SESSION['otp_pending_admin_id'] = (int) $admin['id'];
+                $_SESSION['otp_sent_at'] = time(); // verify_otp.php's resend cooldown
                 header('Location: verify_otp.php');
                 exit;
             }
