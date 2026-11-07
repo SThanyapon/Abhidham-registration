@@ -6,19 +6,19 @@ require_once __DIR__ . '/includes/csrf.php';
 require_once __DIR__ . '/includes/student_validation.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: index.php');
+    header('Location: registration-form.php');
     exit;
 }
 
 verifyCsrf();
 
-// Redirects back to the form with an error, keeping what the user typed (both read once by index.php).
+// Redirects back to the form with an error, keeping what the user typed (both read once by registration-form.php).
 // The message travels in the session, not the URL, so nobody can link to the site showing their own text.
 function failRegistration(string $message, array $old = []): void
 {
     $_SESSION['register_old'] = $old;
     $_SESSION['register_error'] = $message;
-    header('Location: index.php?register=1');
+    header('Location: registration-form.php');
     exit;
 }
 
@@ -56,5 +56,5 @@ $stmt->bind_param($types . 'i', ...$values);
 $stmt->execute();
 $stmt->close();
 
-header('Location: index.php?success=1');
+header('Location: registration-form.php?success=1');
 exit;

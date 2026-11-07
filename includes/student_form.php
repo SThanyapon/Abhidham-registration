@@ -6,7 +6,7 @@ require_once __DIR__ . '/student_validation.php';
  * HTML for one STUDENT_CHOICE_FIELDS question, using its control type: radio buttons, a single-choice
  * dropdown, or the browser's multi-select ('multi', posted as {field}[]). Followed by the {field}_other
  * text box, which is shown (and required) only while อื่นๆ is picked. $value is the stored answer
- * ('multi' answers joined with STUDENT_MULTI_SEPARATOR). Shared by index.php and admin/students.php;
+ * ('multi' answers joined with STUDENT_MULTI_SEPARATOR). Shared by registration-form.php and admin/students.php;
  * the page must also output studentChoiceScript().
  */
 function studentChoiceField(string $field, string $caption, string $value, string $other, bool $required): string
@@ -63,7 +63,7 @@ function studentChoiceField(string $field, string $caption, string $value, strin
  * - Abroad: free-text street address, city, state, postcode and country, stored in the same columns.
  * The hidden panel is a disabled <fieldset>, so its same-named controls are neither posted nor
  * validated. $values holds the stored or refilled student fields (studentResidence() picks the
- * panel). Shared by index.php and admin/students.php; the page must also output addressScript().
+ * panel). Shared by registration-form.php and admin/students.php; the page must also output addressScript().
  */
 function addressFields(array $values, bool $required): string
 {

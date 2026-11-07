@@ -21,7 +21,7 @@ RewriteCond %{HTTPS} !=on
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
 
 RewriteRule ^$ - [L]
-RewriteRule ^(index|register|checkin|lookup|books)\.php$ - [L]
+RewriteRule ^(index|register|registration-form|checkin|lookup|books)\.php$ - [L]
 RewriteRule ^admin/[a-z_]+\.php$ - [L]
 RewriteRule ^assets/.*\.(php|phar|phtml)$ - [R=404,L]
 RewriteRule ^assets/ - [L]

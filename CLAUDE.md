@@ -63,20 +63,25 @@ and the deploy procedure (`git pull --ff-only` on the server).
 ## Architecture
 
 **Request model:** each top-level `.php` file is both the route and the handler — no router, no MVC
-layer. Public pages (`index.php`, `register.php`, `checkin.php`, `lookup.php`, `books.php`) render forms with inline
+layer. Public pages (`index.php`, `registration-form.php` + its POST handler `register.php`,
+`checkin.php`, `lookup.php`, `books.php`) render forms with inline
 HTML/PHP and POST to sibling scripts. Admin pages under `admin/` follow the same pattern but require
 login. There is no templating engine; HTML is written directly in the `.php` files after the PHP logic
 block, using `<?= htmlspecialchars(...) ?>` for all user-supplied output. The web server is an
-allowlist (`/`, the five public `.php` files, `/admin/*.php`, static `/assets/`; everything else 404):
+allowlist (`/`, the six public `.php` files, `/admin/*.php`, static `/assets/`; everything else 404):
 nginx config on a Linux server, the repo's `.htaccess` on Apache/LiteSpeed shared hosting. A new
 top-level page needs both updated (see README "Deploying"). Both also send the same security headers
 (X-Frame-Options, nosniff, Referrer-Policy, HSTS), so a header change goes in both places.
 
-`index.php` is a landing page. While a batch has registration open, the first view in a session pops
-up the intake poster (`assets/images/landingpage.jpg`, a `<dialog>`, flagged by
-`$_SESSION['landing_seen']`). `?register=1` shows the form, and `?success=1` shows the classroom QR
+`index.php` is a notifications page: one `.card.announcement` per thing open right now (a batch
+with registration open → `registration-form.php`; ห้องเรียน with book confirmation open, listed by
+name → `books.php`). With neither open it redirects to `checkin.php`. While a batch has registration
+open, the first view in a session pops up the intake poster (`assets/images/landingpage.jpg`, a
+`<dialog>`, flagged by `$_SESSION['landing_seen']`). Old links `?register=1` / `?success=1`
+redirect to `registration-form.php` (`?success=1`). `registration-form.php` is the form (posting to
+`register.php`, which redirects back) and, with `?success=1`, the classroom QR
 (`assets/images/qr-code7.jpg`). These images are per-intake content; swap the files for a new รุ่น.
-Both "ลงทะเบียนเลย" (the welcome screen's link and the poster's button) are the large blue
+Every "ลงทะเบียนเลย" (the registration card's link and the poster's button) is the large blue
 `.cta-button`.
 
 **`includes/` — shared logic, loaded via `require_once`, no autoloading:**
@@ -127,6 +132,9 @@ Both "ลงทะเบียนเลย" (the welcome screen's link and the p
   Recipients come from `getBackupRecipients()`: the comma-separated `backup_recipient_email` row in
   the `app_settings` key/value table (edited in `admin/backup.php` via `saveBackupRecipients()`),
   falling back to `config.local.php['backup']['recipient_email']` until one is saved.
+- `public_nav.php` — `publicNav($mysqli)`: the `<nav>` every public page outputs (ลงทะเบียน →
+  `registration-form.php`, check-in, lookup, ยืนยันการรับหนังสือ only while `bookConfirmationOpen()`,
+  ผู้ดูแลระบบ). Change the student menu here, not in the pages.
 - `student_helpers.php` — `studentPrefix()` (display prefix: `prefix_other` when `prefix` is
   `อื่นๆ`), `formatAddressLines()` (a students/book_confirmations address as display lines) and `studentClassInstanceId()` (class instance for a student's batch + current level;
   `null` if not created yet). Used by `checkin.php`, `lookup.php`, `admin/approvals.php`,
@@ -161,7 +169,7 @@ Both "ลงทะเบียนเลย" (the welcome screen's link and the p
   `STUDENT_CHOICE_FIELDS` question as its control type (`radio`, `select`, or `multi` = the
   browser's `<select multiple>` posted as `field[]` and stored comma-joined) with a
   show-on-"อื่นๆ" text box, and shows `previous_student_no` only for a returning student
-  (`index.php`, `admin/students.php`). `addressFields()` + `addressScript($dataUrl)` render the
+  (`registration-form.php`, `admin/students.php`). `addressFields()` + `addressScript($dataUrl)` render the
   address block (Thai captions only): a Thailand/abroad radio, then a disabled-when-hidden
   `<fieldset>` per residence, each with its own street-address textarea (Thailand: postcode, then
   จังหวัด/อำเภอ/ตำบล dropdowns filled from the fetched postcode JSON, street address last; abroad:
@@ -251,7 +259,7 @@ when there's no schedule). `class_instances.start_date` is a legacy nullable col
 **ยืนยันการรับหนังสือ (book shipping).** The books are free, so wording says รับหนังสือ /
 จัดส่งหนังสือ, never สั่งซื้อ/ซื้อ. `admin/classes.php` opens or closes it per ห้องเรียน
 (`class_instances.book_confirmation_open`, `migrations/2026-11-book-confirmations.sql`), for any
-class whatever its `is_closed`. While any class is open, `index.php` shows the menu. `books.php`
+class whatever its `is_closed`. While any class is open, every public page shows the menu link (`publicNav()`) and `index.php` a card. `books.php`
 works like this: student ID + name, then the student's current class must be open. The verified
 IDs go into `$_SESSION['book_confirm']`, never hidden fields. The page then shows the registration
 address on the left. The "ยืนยันการรับหนังสือ" button reveals the shipping form on the right

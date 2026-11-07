@@ -41,19 +41,23 @@ original requirements.
    php -S localhost:8000
    ```
 5. Open `http://localhost:8000`:
-   - `/` — landing page; click the large blue "ลงทะเบียนเลย" button or the "ลงทะเบียน" (Register) menu link (or visit `/?register=1`) to open the
-     registration form (in Thailand the address starts with the postcode, which narrows the
-     จังหวัด/อำเภอ/ตำบล dropdowns; abroad it's free text). While a batch's registration is
-     open, the first visit in a browser session pops up the intake poster (`assets/images/landingpage.jpg`); after submitting, the page shows
-     the classroom QR code (`assets/images/qr-code7.jpg`). Replace those images for a new intake.
+   - `/` — notifications page: a card for each thing open right now (a batch's registration →
+     "ลงทะเบียนเลย"; ห้องเรียน with book confirmation open → "ยืนยันการรับหนังสือ"). With nothing
+     open it redirects to `/checkin.php`. While a batch's registration is open, the first visit in
+     a browser session pops up the intake poster (`assets/images/landingpage.jpg`).
+   - `/registration-form.php` — the registration form (the "ลงทะเบียน" menu link and every
+     "ลงทะเบียนเลย" button; old `/?register=1` links redirect here). In Thailand the address starts
+     with the postcode, which narrows the จังหวัด/อำเภอ/ตำบล dropdowns; abroad it's free text. It
+     posts to `register.php`; after submitting, the page shows the classroom QR code
+     (`assets/images/qr-code7.jpg`). Replace the poster and QR images for a new intake.
    - `/checkin.php` — "ลงชื่อ/ตรวจสอบการเข้าเรียน": student ID + name, then pick a class (each
      batch's current, highest class, while it isn't closed) and a session dated today or earlier
      to check in, or leave them blank to just view attendance progress. The result card shows the
      student's current ชั้นเรียน; picking a class that isn't theirs is refused with no progress shown
    - `/lookup.php` — find a student ID (and current ระดับชั้น) by name; also tells
      pending/rejected applicants their registration status
-   - `/books.php` — "ยืนยันการรับหนังสือ" (menu shown on `/` only while a ห้องเรียน has it open on
-     `admin/classes.php`): student ID + name, then the registration address on the left and,
+   - `/books.php` — "ยืนยันการรับหนังสือ" (menu link on every public page, shown only while a ห้องเรียน has
+     it open on `admin/classes.php`): student ID + name, then the registration address on the left and,
      after "ยืนยันการรับหนังสือ", a shipping form on the right (recipient name, phone, address;
      "ใช้ที่อยู่เดียวกับที่ลงทะเบียน" copies the registration address). Once per student per ห้องเรียน
    - `/admin/login.php` — admin backend (username/password, then an emailed OTP code). The
@@ -127,7 +131,7 @@ Substitute your own domain, paths and PHP version.
 
        location = / { }
        location ^~ /assets/ { try_files $uri =404; }
-       location ~ ^/(index|register|checkin|lookup|books)\.php$ { include snippets/abhidham-php.conf; }
+       location ~ ^/(index|register|registration-form|checkin|lookup|books)\.php$ { include snippets/abhidham-php.conf; }
        location ~ ^/admin/[a-z_]+\.php$ { include snippets/abhidham-php.conf; }
        location / { return 404; }
    }
@@ -318,7 +322,7 @@ Production runs the app as a git checkout of this repo, owned by the web server 
    pull: new code may depend on them (e.g. `2026-11-class-start-date-optional.sql` must run before
    the code that stops writing `class_instances.start_date`, `2026-11-class-closed.sql` before
    the code that reads `class_instances.is_closed`, and `2026-11-book-confirmations.sql` before the
-   code that reads `class_instances.book_confirmation_open`, which `index.php` queries on every visit).
+   code that reads `class_instances.book_confirmation_open`, which every public page queries for its menu).
    A deploy that adds a `config.local.php` key (e.g. `rate_limit.book_confirm`) also needs it added
    to the server's copy. A missing rate-limit key silently means no limit. On a host with Git auto-deploy, which
    publishes on every push, apply them before pushing.

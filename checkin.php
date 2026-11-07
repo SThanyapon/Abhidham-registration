@@ -7,6 +7,7 @@ require_once __DIR__ . '/includes/input.php';
 require_once __DIR__ . '/includes/attendance.php';
 require_once __DIR__ . '/includes/date_helpers.php';
 require_once __DIR__ . '/includes/student_helpers.php';
+require_once __DIR__ . '/includes/public_nav.php';
 
 $mysqli = getDbConnection();
 $error = null;
@@ -190,12 +191,7 @@ foreach ($classes as $class) {
 </head>
 <body>
     <h1>ลงชื่อ/ตรวจสอบการเข้าเรียน</h1>
-    <nav>
-        <a href="index.php">ลงทะเบียน</a>
-        <a href="checkin.php">ลงชื่อ/ตรวจสอบการเข้าเรียน</a>
-        <a href="lookup.php">ค้นหารหัสนักศึกษา</a>
-        <a class="nav-admin" href="admin/login.php">ผู้ดูแลระบบ</a>
-    </nav>
+    <?= publicNav($mysqli) ?>
 
     <?php if ($error): ?>
         <p class="error"><?= htmlspecialchars($error) ?></p>

@@ -5,6 +5,7 @@ require_once __DIR__ . '/includes/rate_limit.php';
 require_once __DIR__ . '/includes/csrf.php';
 require_once __DIR__ . '/includes/input.php';
 require_once __DIR__ . '/includes/student_helpers.php';
+require_once __DIR__ . '/includes/public_nav.php';
 
 $error = null;
 $result = null;
@@ -54,12 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
     <h1>ค้นหารหัสนักศึกษา</h1>
-    <nav>
-        <a href="index.php">ลงทะเบียน</a>
-        <a href="checkin.php">ลงชื่อ/ตรวจสอบการเข้าเรียน</a>
-        <a href="lookup.php">ค้นหารหัสนักศึกษา</a>
-        <a class="nav-admin" href="admin/login.php">ผู้ดูแลระบบ</a>
-    </nav>
+    <?= publicNav(getDbConnection()) ?>
 
     <?php if ($error): ?>
         <p class="error"><?= htmlspecialchars($error) ?></p>

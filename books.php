@@ -6,6 +6,7 @@ require_once __DIR__ . '/includes/csrf.php';
 require_once __DIR__ . '/includes/input.php';
 require_once __DIR__ . '/includes/date_helpers.php';
 require_once __DIR__ . '/includes/student_helpers.php';
+require_once __DIR__ . '/includes/public_nav.php';
 require_once __DIR__ . '/includes/student_form.php';
 
 // ยืนยันการรับหนังสือ: a student of a ห้องเรียน whose book confirmation is open (admin/classes.php)
@@ -188,7 +189,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $justConfirmed = $_SERVER['REQUEST_METHOD'] === 'GET' && $confirmation !== null;
 $showForm = $student && $class && !$confirmation;
-$anyOpen = (bool) $mysqli->query('SELECT 1 FROM class_instances WHERE book_confirmation_open = 1 LIMIT 1')->fetch_row();
+$anyOpen = bookConfirmationOpen($mysqli);
 
 $registrationValues = $student ? [
     'residence' => studentResidence($student),
@@ -213,13 +214,7 @@ $registrationValues = $student ? [
 </head>
 <body>
     <h1>ยืนยันการรับหนังสือ</h1>
-    <nav>
-        <a href="index.php">ลงทะเบียน</a>
-        <a href="checkin.php">ลงชื่อ/ตรวจสอบการเข้าเรียน</a>
-        <a href="lookup.php">ค้นหารหัสนักศึกษา</a>
-        <?php if ($anyOpen): ?><a href="books.php">ยืนยันการรับหนังสือ</a><?php endif; ?>
-        <a class="nav-admin" href="admin/login.php">ผู้ดูแลระบบ</a>
-    </nav>
+    <?= publicNav($mysqli) ?>
 
     <?php if ($error): ?>
         <p class="error"><?= htmlspecialchars($error) ?></p>
